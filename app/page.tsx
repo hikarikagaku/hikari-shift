@@ -23,10 +23,12 @@ export default function Home() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [activeStartDate, setActiveStartDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<'month' | 'week'>('month');
+  
   const [newStaffNameInput, setNewStaffNameInput] = useState(''); 
   const [newStaffName, setNewStaffName] = useState(''); 
-  const [startTime, setStartTime] = useState('09:00');
-  const [endTime, setEndTime] = useState('18:00');
+  // 標準時間を 08:30 と 17:30 に変更
+  const [startTime, setStartTime] = useState('08:30');
+  const [endTime, setEndTime] = useState('17:30');
   const [newRoleItem, setNewRoleItem] = useState('');
   const [assigningShiftId, setAssigningShiftId] = useState<string | null>(null);
   const [selectedRoleForShift, setSelectedRoleForShift] = useState("");
@@ -100,11 +102,11 @@ export default function Home() {
       <div className="w-full flex flex-col gap-2 mt-2 overflow-y-auto max-h-[130px]">
         {ds.map(s => (
           <div key={s.id} className={`${getStaffColor(s.staff_name)} text-white px-2 py-2 rounded-xl shadow-lg w-full border-b-4 border-black/20`}>
-            {/* スタッフ名を最大化 */}
+            {/* スタッフ名は見やすく大きいまま */}
             <div className="text-[14px] font-black leading-tight truncate mb-1 text-center uppercase tracking-tighter">
               {s.staff_name}
             </div>
-            {/* 作業内容を強調 */}
+            {/* 作業内容も大きいまま */}
             <div className="bg-white/90 text-slate-800 rounded-lg py-1 text-center text-[12px] font-black truncate shadow-inner">
               {s.role || '未設定'}
             </div>
@@ -170,7 +172,8 @@ export default function Home() {
                     d.setDate(selectedDate.getDate() + diff);
                     return (
                       <div key={i} onClick={()=>setSelectedDate(d)} className={`bg-white p-4 min-h-[500px] cursor-pointer hover:bg-slate-50 transition-colors ${getDayClass(d)} ${d.toDateString()===selectedDate.toDateString()?'ring-4 ring-inset ring-blue-500':''}`}>
-                        <div className={`text-center font-black text-xl mb-4 ${d.toDateString()===new Date().toDateString()?'bg-blue-600 text-white w-10 h-10 rounded-full mx-auto flex items-center justify-center shadow-xl':''}`}>{d.getDate()}</div>
+                        {/* 週表示の日付も標準サイズ（text-lg）に */}
+                        <div className={`text-center font-bold text-lg mb-4 ${d.toDateString()===new Date().toDateString()?'bg-blue-600 text-white w-9 h-9 rounded-full mx-auto flex items-center justify-center shadow-xl':''}`}>{d.getDate()}</div>
                         {renderShiftBadges(d)}
                       </div>
                     )
@@ -247,7 +250,8 @@ export default function Home() {
         .custom-huge-calendar .react-calendar__month-view__days__day {
           min-height: 180px !important; display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: flex-start !important; padding: 8px !important; border: 1px solid #f1f5f9 !important;
         }
-        .custom-huge-calendar .react-calendar__month-view__days__day abbr { font-weight: 900 !important; font-size: 1.5rem !important; text-decoration: none !important; margin-bottom: 10px !important; }
+        /* 月表示の日付を標準サイズ（1rem = 16px）に戻す */
+        .custom-huge-calendar .react-calendar__month-view__days__day abbr { font-weight: 700 !important; font-size: 1rem !important; text-decoration: none !important; margin-bottom: 8px !important; }
         .custom-huge-calendar .react-calendar__navigation { display: none !important; }
         .sat-bg { background-color: #f8fbff !important; }
         .sun-bg { background-color: #fff9f9 !important; }
