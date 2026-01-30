@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import Calendar from 'react-calendar'
-import { Trash2, Users, Settings, LayoutDashboard, ChevronLeft, ChevronRight, PlusCircle, Download } from 'lucide-react'
+import { Trash2, Users, Settings, LayoutDashboard, ChevronLeft, ChevronRight, PlusCircle, Download, List } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import 'react-calendar/dist/Calendar.css'
 import './calendar-custom.css'
@@ -80,36 +80,27 @@ export default function Home() {
     XLSX.writeFile(wb, `hikari_shift_${getJstDateString(new Date())}.xlsx`);
   };
 
-  const renderShiftBadges = (date: Date, isLarge: boolean) => {
+  const renderShiftBadges = (date: Date) => {
     const dateStr = getJstDateString(date);
     const ds = shifts.filter(s => s.start_time.startsWith(dateStr));
     return (
-      <div className={`mt-1 flex flex-col gap-1 overflow-y-auto max-h-[80px] md:max-h-none`}>
+      <div className="w-full flex flex-col gap-1 mt-1 overflow-y-auto max-h-[100px]">
         {ds.map(s => (
-          <div key={s.id} className={`${getStaffColor(s.staff_name)} text-white p-1 rounded shadow-sm text-[8px] md:text-[10px]`}>
-            <div className="flex justify-between font-bold border-b border-white/10 mb-1 px-0.5">
+          <div key={s.id} className={`${getStaffColor(s.staff_name)} text-white p-1 rounded shadow-sm text-[9px] leading-tight w-full`}>
+            <div className="flex justify-between font-bold border-b border-white/20 mb-0.5 pb-0.5">
               <span className="truncate">{s.staff_name}</span>
-              <span className="opacity-80 font-mono hidden md:inline">{s.start_time.split('T')[1].slice(0,5)}</span>
             </div>
-            {assigningShiftId === s.id ? (
-              <div className="flex flex-col gap-1 p-0.5 bg-white/10 rounded">
-                <select className="text-black w-full text-[8px] rounded p-0.5" value={selectedRoleForShift} onChange={e=>setSelectedRoleForShift(e.target.value)}>
-                  <option value="">作業選択</option>
-                  {roleMaster.map(r => <option key={r.id} value={r.name}>{r.name}</option>)}
-                </select>
-                <button onClick={()=>handleAssignRole(s.id)} className="bg-white text-blue-600 rounded text-[8px] font-bold py-0.5 shadow-sm">決定</button>
-              </div>
-            ) : (
-              <div className="cursor-pointer bg-white/20 hover:bg-white/30 rounded px-1 truncate font-bold text-center py-0.5" 
-                   onClick={()=>{setAssigningShiftId(s.id); setSelectedRoleForShift(s.role||"")}}>
-                {s.role || '未設定'}
-              </div>
-            )}
+            <div className="text-center font-bold text-[8px] truncate bg-white/10 rounded">
+              {s.role || '未'}
+            </div>
           </div>
         ))}
       </div>
     );
   }
+
+  // 選択された日の詳細リスト（カレンダーの外）
+  const selectedDayShifts = shifts.filter(s => s.start_time.startsWith(getJstDateString(selectedDate)));
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900 pb-20">
@@ -122,131 +113,165 @@ export default function Home() {
         </button>
       </header>
 
-      <main className="max-w-[1600px] mx-auto p-4 flex flex-col gap-6">
-        <div className="bg-white p-6 rounded-[2.5rem] shadow-2xl border border-slate-200">
-          <div className="flex justify-between items-center mb-8">
-            <div className="flex items-center gap-4">
-              <div className="flex gap-2">
-                <button onClick={()=>setSelectedDate(new Date(selectedDate.setMonth(selectedDate.getMonth()-1)))} className="p-3 border-2 border-slate-100 rounded-full hover:bg-slate-50 transition-all"><ChevronLeft size={24}/></button>
-                <button onClick={()=>setSelectedDate(new Date(selectedDate.setMonth(selectedDate.getMonth()+1)))} className="p-3 border-2 border-slate-100 rounded-full hover:bg-slate-50 transition-all"><ChevronRight size={24}/></button>
+      <main className="max-w-[1600px] mx-auto p-4 grid lg:grid-cols-12 gap-6">
+        {/* 左側：メインカレンダー */}
+        <div className="lg:col-span-8 space-y-6">
+          <div className="bg-white p-6 rounded-[2rem] shadow-2xl border border-slate-200">
+            <div className="flex justify-between items-center mb-8">
+              <div className="flex items-center gap-4">
+                <div className="flex gap-2">
+                  <button onClick={()=>setSelectedDate(new Date(selectedDate.setMonth(selectedDate.getMonth()-1)))} className="p-2 border-2 rounded-full hover:bg-slate-50"><ChevronLeft size={20}/></button>
+                  <button onClick={()=>setSelectedDate(new Date(selectedDate.setMonth(selectedDate.getMonth()+1)))} className="p-2 border-2 rounded-full hover:bg-slate-50"><ChevronRight size={20}/></button>
+                </div>
+                <span className="font-black text-2xl text-slate-800">{selectedDate.getFullYear()}年{selectedDate.getMonth()+1}月</span>
               </div>
-              <span className="font-black text-3xl text-slate-800 tracking-tight">{selectedDate.getFullYear()}年{selectedDate.getMonth()+1}月</span>
+              <div className="flex bg-slate-100 p-1 rounded-xl text-xs font-black">
+                <button onClick={()=>setViewMode('month')} className={`px-6 py-2 rounded-lg transition-all ${viewMode==='month'?'bg-white shadow text-blue-600':'text-slate-400'}`}>月表示</button>
+                <button onClick={()=>setViewMode('week')} className={`px-6 py-2 rounded-lg transition-all ${viewMode==='week'?'bg-white shadow text-blue-600':'text-slate-400'}`}>週表示</button>
+              </div>
             </div>
-            <div className="flex bg-slate-100 p-1.5 rounded-2xl text-sm font-black shadow-inner">
-              <button onClick={()=>setViewMode('month')} className={`px-8 py-3 rounded-xl transition-all ${viewMode==='month'?'bg-white shadow-md text-blue-600':'text-slate-400'}`}>月表示</button>
-              <button onClick={()=>setViewMode('week')} className={`px-8 py-3 rounded-xl transition-all ${viewMode==='week'?'bg-white shadow-md text-blue-600':'text-slate-400'}`}>週表示</button>
-            </div>
-          </div>
 
-          <div className="calendar-container overflow-x-auto">
-            {viewMode === 'month' ? (
-              <div className="min-w-[800px]">
+            <div className="calendar-wrapper">
+              {viewMode === 'month' ? (
                 <Calendar 
                   onChange={(v:any)=>setSelectedDate(v)} 
                   value={selectedDate} 
-                  tileContent={({date})=>renderShiftBadges(date, false)} 
+                  tileContent={({date})=>renderShiftBadges(date)} 
                   locale="ja-JP" 
                   className="w-full border-none custom-huge-calendar" 
                 />
-              </div>
-            ) : (
-              <div className="grid grid-cols-7 gap-1 bg-slate-200 border rounded-3xl overflow-hidden shadow-2xl">
-                {['月','火','水','木','金','土','日'].map((w,i)=>(<div key={i} className="bg-slate-50 p-4 text-center text-xs font-black text-slate-500 uppercase tracking-widest">{w}</div>))}
-                {[0,1,2,3,4,5,6].map(i => {
-                  const d = new Date(selectedDate);
-                  const day = d.getDay();
-                  d.setDate(d.getDate() - (day === 0 ? 6 : day - 1) + i);
-                  return (
-                    <div key={i} onClick={()=>setSelectedDate(d)} className={`bg-white p-3 min-h-[400px] cursor-pointer transition-all hover:bg-blue-50/30 ${d.toDateString()===selectedDate.toDateString()?'bg-blue-50 ring-4 ring-inset ring-blue-400/20':''}`}>
-                      <div className={`text-center font-black text-lg mb-4 ${d.toDateString()===new Date().toDateString()?'bg-blue-600 text-white w-10 h-10 rounded-full mx-auto flex items-center justify-center shadow-lg':''}`}>{d.getDate()}</div>
-                      {renderShiftBadges(d, true)}
-                    </div>
-                  )
-                })}
-              </div>
-            )}
+              ) : (
+                <div className="grid grid-cols-7 gap-px bg-slate-200 border rounded-2xl overflow-hidden shadow-inner">
+                  {['月','火','水','木','金','土','日'].map((w,i)=>(<div key={i} className="bg-slate-50 p-2 text-center text-[10px] font-black text-slate-500 uppercase">{w}</div>))}
+                  {[0,1,2,3,4,5,6].map(i => {
+                    const d = new Date(selectedDate);
+                    const day = d.getDay();
+                    d.setDate(d.getDate() - (day === 0 ? 6 : day - 1) + i);
+                    return (
+                      <div key={i} onClick={()=>setSelectedDate(d)} className={`bg-white p-1 min-h-[300px] cursor-pointer transition-colors ${d.toDateString()===selectedDate.toDateString()?'bg-blue-50 ring-2 ring-inset ring-blue-400':''}`}>
+                        <div className={`text-center font-bold text-xs mb-1 ${d.toDateString()===new Date().toDateString()?'bg-blue-600 text-white w-6 h-6 rounded-full mx-auto flex items-center justify-center':''}`}>{d.getDate()}</div>
+                        {renderShiftBadges(d)}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
           </div>
-        </div>
 
-        <div className="grid lg:grid-cols-2 gap-8">
-          {/* シフト入力 */}
-          <form onSubmit={onAddShift} className="bg-white p-8 rounded-[2rem] shadow-xl border-t-8 border-blue-600 flex flex-col gap-6">
-            <div className="flex items-center justify-between">
-              <h3 className="font-black text-blue-600 flex items-center gap-2 text-2xl"><PlusCircle size={28}/> シフト入力</h3>
-              <div className="bg-blue-50 px-6 py-2 rounded-full font-black text-blue-700 border border-blue-100 shadow-sm text-lg">
-                {getJstDateString(selectedDate)}
-              </div>
-            </div>
-            <div className="grid md:grid-cols-3 gap-4">
-              <div className="flex flex-col gap-2">
-                <label className="text-xs font-black text-slate-400 ml-2">スタッフ</label>
-                <select value={newStaffName} onChange={e=>setNewStaffName(e.target.value)} className="w-full border-2 border-slate-100 p-4 rounded-2xl bg-white text-sm font-bold outline-none focus:border-blue-400 transition-all shadow-sm" required>
-                  <option value="">選択</option>
-                  {staffList.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
-                </select>
-              </div>
-              <div className="flex flex-col gap-2">
-                <label className="text-xs font-black text-slate-400 ml-2 text-center">開始</label>
-                <input type="time" value={startTime} onChange={e=>setStartTime(e.target.value)} className="w-full border-2 border-slate-100 p-4 rounded-2xl text-sm font-bold outline-none focus:border-blue-400 transition-all shadow-sm" />
-              </div>
-              <div className="flex flex-col gap-2">
-                <label className="text-xs font-black text-slate-400 ml-2 text-center">終了</label>
-                <input type="time" value={endTime} onChange={e=>setEndTime(e.target.value)} className="w-full border-2 border-slate-100 p-4 rounded-2xl text-sm font-bold outline-none focus:border-blue-400 transition-all shadow-sm" />
-              </div>
-            </div>
-            <button className="w-full bg-blue-600 text-white font-black py-5 rounded-2xl shadow-xl hover:bg-blue-700 active:scale-95 transition-all text-lg tracking-widest">
-              この内容で登録
-            </button>
-          </form>
-
-          {/* マスター設定 */}
-          <div className="bg-white p-8 rounded-[2rem] shadow-xl border border-slate-100">
-            <h3 className="font-black mb-6 flex items-center gap-2 text-slate-700 text-xl"><Settings size={24}/> 作業内容の登録</h3>
-            <div className="flex gap-2 mb-6">
-              <input value={newRoleItem} onChange={e=>setNewRoleItem(e.target.value)} className="flex-1 border-2 border-slate-100 p-4 rounded-2xl text-sm font-bold outline-none focus:border-blue-400 shadow-sm" placeholder="1号機削り、2号機削り など" />
+          <div className="bg-white p-6 rounded-[1.5rem] shadow-xl border border-slate-100">
+            <h3 className="font-black mb-4 flex items-center gap-2 text-slate-700 text-lg"><Settings size={22}/> 作業内容マスター</h3>
+            <div className="flex gap-2 mb-4">
+              <input value={newRoleItem} onChange={e=>setNewRoleItem(e.target.value)} className="flex-1 border p-3 rounded-xl text-sm font-bold outline-none" placeholder="1号機削り など" />
               <button onClick={async()=>{
                 if(!newRoleItem) return;
                 await supabase.from('role_master').insert([{name:newRoleItem}]);
                 setNewRoleItem(''); fetchAll();
-              }} className="bg-slate-800 text-white px-8 rounded-2xl font-black shadow-lg hover:bg-slate-900 transition-all">追加</button>
+              }} className="bg-slate-800 text-white px-6 rounded-xl font-bold text-sm shadow-md">追加</button>
             </div>
-            <div className="flex flex-wrap gap-2 overflow-y-auto max-h-[150px] p-2 bg-slate-50 rounded-2xl shadow-inner">
+            <div className="flex flex-wrap gap-2 max-h-[100px] overflow-y-auto">
               {roleMaster.map(r => (
-                <div key={r.id} className="bg-white border-2 border-slate-100 p-2 px-4 rounded-xl flex items-center gap-2 text-xs font-black text-slate-600 shadow-sm">
-                  {r.name} <button onClick={async()=>{if(confirm('削除？')){await supabase.from('role_master').delete().eq('id',r.id); fetchAll()}}} className="text-slate-300 hover:text-red-500 text-lg">×</button>
+                <div key={r.id} className="bg-slate-50 border p-1.5 px-3 rounded-lg flex items-center gap-2 text-[10px] font-bold text-slate-600 shadow-sm">
+                  {r.name} <button onClick={async()=>{if(confirm('削除？')){await supabase.from('role_master').delete().eq('id',r.id); fetchAll()}}} className="text-slate-300 hover:text-red-500">×</button>
                 </div>
               ))}
             </div>
           </div>
         </div>
+
+        {/* 右側：入力フォーム & 詳細リスト */}
+        <div className="lg:col-span-4 space-y-6">
+          <form onSubmit={onAddShift} className="bg-white p-6 rounded-[1.5rem] shadow-xl border-t-4 border-blue-600 space-y-4">
+            <h3 className="font-black text-blue-600 flex items-center gap-2 text-lg"><PlusCircle size={22}/> シフト入力</h3>
+            <div className="bg-blue-50 p-3 rounded-xl text-center font-black text-blue-800 text-sm">
+              選択日：{getJstDateString(selectedDate)}
+            </div>
+            <div className="grid grid-cols-1 gap-4">
+              <select value={newStaffName} onChange={e=>setNewStaffName(e.target.value)} className="border p-3 rounded-xl bg-white text-sm font-bold" required>
+                <option value="">スタッフを選択</option>
+                {staffList.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
+              </select>
+              <div className="grid grid-cols-2 gap-2">
+                <input type="time" value={startTime} onChange={e=>setStartTime(e.target.value)} className="border p-3 rounded-xl text-sm font-bold" />
+                <input type="time" value={endTime} onChange={e=>setEndTime(e.target.value)} className="border p-3 rounded-xl text-sm font-bold" />
+              </div>
+            </div>
+            <button className="w-full bg-blue-600 text-white font-black py-4 rounded-xl shadow-lg hover:bg-blue-700 active:scale-95 transition-all text-sm tracking-widest">
+              登録
+            </button>
+          </form>
+
+          {/* ★ ここが復活した詳細リスト */}
+          <div className="bg-white p-6 rounded-[1.5rem] shadow-xl border border-slate-100 flex flex-col gap-4">
+            <h3 className="font-black text-slate-700 flex items-center gap-2 text-lg"><List size={22}/> 本日のシフト詳細・割当</h3>
+            <div className="flex flex-col gap-3 max-h-[500px] overflow-y-auto pr-1">
+              {selectedDayShifts.length === 0 ? (
+                <p className="text-xs text-slate-400 text-center py-4">登録されたシフトはありません</p>
+              ) : (
+                selectedDayShifts.map(s => (
+                  <div key={s.id} className={`p-4 rounded-2xl border-2 flex flex-col gap-3 shadow-sm ${getStaffColor(s.staff_name).replace('bg-', 'border-')}`}>
+                    <div className="flex justify-between items-center">
+                      <span className="font-black text-sm">{s.staff_name}</span>
+                      <div className="flex items-center gap-3">
+                        <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-1 rounded-md">
+                          {s.start_time.split('T')[1].slice(0,5)} 〜 {s.end_time.split('T')[1].slice(0,5)}
+                        </span>
+                        <button onClick={async()=>{if(confirm('削除しますか？')){await supabase.from('shifts').delete().eq('id',s.id);fetchAll()}}} className="text-slate-300 hover:text-red-500">
+                          <Trash2 size={18}/>
+                        </button>
+                      </div>
+                    </div>
+                    
+                    {/* 作業内容の割り当てプルダウン */}
+                    <div className="flex gap-2">
+                      <select 
+                        className="flex-1 border-2 border-slate-100 p-2 rounded-xl text-xs font-bold bg-white outline-none focus:border-blue-400"
+                        value={assigningShiftId === s.id ? selectedRoleForShift : (s.role || "")}
+                        onChange={(e) => {
+                          setAssigningShiftId(s.id);
+                          setSelectedRoleForShift(e.target.value);
+                        }}
+                      >
+                        <option value="">作業内容を選択</option>
+                        {roleMaster.map(r => <option key={r.id} value={r.name}>{r.name}</option>)}
+                      </select>
+                      <button 
+                        onClick={() => handleAssignRole(s.id)}
+                        className={`px-4 py-2 rounded-xl font-black text-xs text-white transition-all shadow-md ${assigningShiftId === s.id ? 'bg-blue-600 scale-100' : 'bg-slate-300 scale-95 opacity-50'}`}
+                        disabled={assigningShiftId !== s.id}
+                      >
+                        確定
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
       </main>
 
-      {/* 巨大化用スタイル */}
       <style jsx global>{`
         .custom-huge-calendar {
           width: 100% !important;
-          background: transparent !important;
+          border: none !important;
         }
         .custom-huge-calendar .react-calendar__month-view__days__day {
-          height: 140px !important; /* マスの高さを大きく */
-          display: flex;
-          flex-direction: column;
-          align-items: stretch !important;
+          min-height: 120px !important; 
+          display: flex !important;
+          flex-direction: column !important;
+          align-items: center !important;
           justify-content: flex-start !important;
-          padding: 8px !important;
-          border: 1px solid #f1f5f9 !important;
-          font-weight: 800;
+          padding: 4px !important;
+          border: 0.5px solid #f1f5f9 !important;
         }
-        .custom-huge-calendar .react-calendar__tile--active {
-          background: #eff6ff !important;
-          color: #2563eb !important;
+        .custom-huge-calendar .react-calendar__month-view__days__day abbr {
+          font-weight: 800 !important;
+          font-size: 14px !important;
+          text-decoration: none !important;
         }
-        .custom-huge-calendar .react-calendar__tile--now {
-          background: #f8fafc !important;
-          color: #2563eb !important;
-        }
-        .react-calendar__navigation button {
-          display: none; /* カレンダー側のナビを消して自作に統一 */
+        .custom-huge-calendar .react-calendar__navigation {
+          display: none !important;
         }
       `}</style>
     </div>
