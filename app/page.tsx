@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js'
 import Calendar from 'react-calendar'
 import { Trash2, Settings, LayoutDashboard, ChevronLeft, ChevronRight, PlusCircle, Download, List, UserPlus } from 'lucide-react'
 import * as XLSX from 'xlsx'
+import HolidayJp from '@holiday-jp/holiday_jp'
 import 'react-calendar/dist/Calendar.css'
 import './calendar-custom.css'
 
@@ -22,7 +23,6 @@ export default function Home() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [activeStartDate, setActiveStartDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<'month' | 'week'>('month');
-  
   const [newStaffNameInput, setNewStaffNameInput] = useState(''); 
   const [newStaffName, setNewStaffName] = useState(''); 
   const [startTime, setStartTime] = useState('09:00');
@@ -49,6 +49,16 @@ export default function Home() {
     return `${y}-${m}-${d}`;
   }
 
+  const isHoliday = (date: Date) => HolidayJp.isHoliday(date);
+
+  const getDayClass = (date: Date) => {
+    if (isHoliday(date)) return 'text-red-500 holiday-bg';
+    const day = date.getDay();
+    if (day === 0) return 'text-red-500 sun-bg';
+    if (day === 6) return 'text-blue-500 sat-bg';
+    return '';
+  };
+
   const handleMove = (direction: number) => {
     const nextDate = new Date(selectedDate);
     if (viewMode === 'month') {
@@ -63,11 +73,10 @@ export default function Home() {
 
   const handleAssignRole = async (shiftId: string) => {
     if (!selectedRoleForShift) return alert("作業を選択してください");
-    const { error } = await supabase.from('shifts').update({ role: selectedRoleForShift }).match({ id: shiftId });
-    if (error) return alert(`保存失敗: ${error.message}`);
+    await supabase.from('shifts').update({ role: selectedRoleForShift }).match({ id: shiftId });
     setAssigningShiftId(null);
     setSelectedRoleForShift("");
-    await fetchAll(); // ここでカレンダーを即座に再描画
+    await fetchAll();
   }
 
   const exportToExcel = () => {
@@ -88,11 +97,13 @@ export default function Home() {
     const dateStr = getJstDateString(date);
     const ds = shifts.filter(s => s.start_time.startsWith(dateStr));
     return (
-      <div className="w-full flex flex-col gap-1 mt-1 overflow-y-auto max-h-[100px]">
+      <div className="w-full flex flex-col gap-1.5 mt-2 overflow-y-auto max-h-[120px]">
         {ds.map(s => (
-          <div key={s.id} className={`${getStaffColor(s.staff_name)} text-white px-1.5 py-1 rounded shadow-sm text-[9px] leading-tight w-full`}>
-            <div className="font-black border-b border-white/20 mb-1 truncate">{s.staff_name}</div>
-            <div className="bg-black/20 rounded text-center font-bold truncate italic">{s.role || '未割当'}</div>
+          <div key={s.id} className={`${getStaffColor(s.staff_name)} text-white px-2 py-1.5 rounded-lg shadow-md w-full border-l-4 border-black/20`}>
+            <div className="text-[11px] font-black border-b border-white/30 mb-1 truncate drop-shadow-sm">{s.staff_name}</div>
+            <div className="bg-white/20 rounded px-1 py-0.5 text-center text-[10px] font-bold truncate tracking-tighter">
+              {s.role || '未設定'}
+            </div>
           </div>
         ))}
       </div>
@@ -104,31 +115,30 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900 pb-20">
       <header className="bg-white border-b p-4 flex justify-between items-center sticky top-0 z-50 shadow-sm">
-        <h1 className="font-black text-blue-600 italic flex items-center gap-2 text-xl tracking-tighter">
-          <LayoutDashboard size={24}/> HIKARI SHIFT
+        <h1 className="font-black text-blue-600 italic flex items-center gap-2 text-2xl tracking-tighter">
+          <LayoutDashboard size={28}/> HIKARI SHIFT
         </h1>
-        <button onClick={exportToExcel} className="flex items-center gap-2 bg-emerald-600 text-white px-5 py-2.5 rounded-2xl font-bold text-sm hover:bg-emerald-700 transition-colors shadow-lg">
-          <Download size={18}/> Excel保存
+        <button onClick={exportToExcel} className="flex items-center gap-2 bg-emerald-600 text-white px-6 py-3 rounded-2xl font-bold text-base hover:bg-emerald-700 shadow-lg transition-transform active:scale-95">
+          <Download size={20}/> Excel保存
         </button>
       </header>
 
       <main className="max-w-[1600px] mx-auto p-4 grid lg:grid-cols-12 gap-6">
         <div className="lg:col-span-8 space-y-6">
-          <div className="bg-white p-6 rounded-[2rem] shadow-2xl border border-slate-200">
-            {/* カレンダーヘッダー */}
+          <div className="bg-white p-6 rounded-[2.5rem] shadow-2xl border border-slate-200">
             <div className="flex justify-between items-center mb-8">
-              <div className="flex items-center gap-4">
-                <div className="flex gap-2">
-                  <button onClick={()=>handleMove(-1)} className="p-2 border-2 rounded-full hover:bg-slate-50 transition-all active:scale-90"><ChevronLeft size={20}/></button>
-                  <button onClick={()=>handleMove(1)} className="p-2 border-2 rounded-full hover:bg-slate-50 transition-all active:scale-90"><ChevronRight size={20}/></button>
+              <div className="flex items-center gap-6">
+                <div className="flex gap-3">
+                  <button onClick={()=>handleMove(-1)} className="p-3 border-2 rounded-full hover:bg-slate-50 transition-all active:scale-90"><ChevronLeft size={24}/></button>
+                  <button onClick={()=>handleMove(1)} className="p-3 border-2 rounded-full hover:bg-slate-50 transition-all active:scale-90"><ChevronRight size={24}/></button>
                 </div>
-                <span className="font-black text-2xl text-slate-800">
+                <span className="font-black text-3xl text-slate-800 tracking-tight">
                   {viewMode === 'month' ? `${activeStartDate.getFullYear()}年${activeStartDate.getMonth()+1}月` : `${selectedDate.getMonth()+1}月${selectedDate.getDate()}日の週`}
                 </span>
               </div>
-              <div className="flex bg-slate-100 p-1 rounded-xl text-xs font-black">
-                <button onClick={()=>setViewMode('month')} className={`px-6 py-2 rounded-lg transition-all ${viewMode==='month'?'bg-white shadow text-blue-600':'text-slate-400'}`}>月表示</button>
-                <button onClick={()=>setViewMode('week')} className={`px-6 py-2 rounded-lg transition-all ${viewMode==='week'?'bg-white shadow text-blue-600':'text-slate-400'}`}>週表示</button>
+              <div className="flex bg-slate-100 p-1.5 rounded-2xl text-sm font-black">
+                <button onClick={()=>setViewMode('month')} className={`px-8 py-2.5 rounded-xl transition-all ${viewMode==='month'?'bg-white shadow-md text-blue-600':'text-slate-400'}`}>月表示</button>
+                <button onClick={()=>setViewMode('week')} className={`px-8 py-2.5 rounded-xl transition-all ${viewMode==='week'?'bg-white shadow-md text-blue-600':'text-slate-400'}`}>週表示</button>
               </div>
             </div>
 
@@ -140,20 +150,23 @@ export default function Home() {
                   onActiveStartDateChange={({activeStartDate: nextDate}) => nextDate && setActiveStartDate(nextDate)}
                   value={selectedDate} 
                   tileContent={({date})=>renderShiftBadges(date)} 
+                  tileClassName={({date}) => getDayClass(date)}
                   locale="ja-JP" 
                   className="w-full border-none custom-huge-calendar" 
                 />
               ) : (
-                <div className="grid grid-cols-7 gap-px bg-slate-200 border rounded-2xl overflow-hidden shadow-inner font-bold min-w-[700px]">
-                  {['月','火','水','木','金','土','日'].map((w,i)=>(<div key={i} className="bg-slate-50 p-2 text-center text-xs text-slate-500 uppercase">{w}</div>))}
+                <div className="grid grid-cols-7 gap-px bg-slate-200 border-2 rounded-[2rem] overflow-hidden shadow-inner font-bold min-w-[800px]">
+                  {['月','火','水','木','金','土','日'].map((w,i)=>(
+                    <div key={i} className={`bg-slate-50 p-3 text-center text-sm font-black uppercase ${i===5?'text-blue-500':i===6?'text-red-500':''}`}>{w}</div>
+                  ))}
                   {[0,1,2,3,4,5,6].map(i => {
                     const d = new Date(selectedDate);
                     const day = d.getDay();
                     const diff = i - (day === 0 ? 6 : day - 1);
                     d.setDate(selectedDate.getDate() + diff);
                     return (
-                      <div key={i} onClick={()=>setSelectedDate(d)} className={`bg-white p-2 min-h-[400px] cursor-pointer hover:bg-slate-50 transition-colors ${d.toDateString()===selectedDate.toDateString()?'bg-blue-50 ring-2 ring-inset ring-blue-400':''}`}>
-                        <div className={`text-center font-black text-sm mb-2 ${d.toDateString()===new Date().toDateString()?'bg-blue-600 text-white w-7 h-7 rounded-full mx-auto flex items-center justify-center':''}`}>{d.getDate()}</div>
+                      <div key={i} onClick={()=>setSelectedDate(d)} className={`bg-white p-3 min-h-[450px] cursor-pointer hover:bg-slate-50 transition-colors ${getDayClass(d)} ${d.toDateString()===selectedDate.toDateString()?'ring-4 ring-inset ring-blue-400':''}`}>
+                        <div className={`text-center font-black text-lg mb-3 ${d.toDateString()===new Date().toDateString()?'bg-blue-600 text-white w-9 h-9 rounded-full mx-auto flex items-center justify-center shadow-lg':''}`}>{d.getDate()}</div>
                         {renderShiftBadges(d)}
                       </div>
                     )
@@ -162,18 +175,18 @@ export default function Home() {
               )}
             </div>
           </div>
-
-          {/* 作業マスター登録 */}
-          <div className="bg-white p-6 rounded-[1.5rem] shadow-xl border border-slate-100">
-            <h3 className="font-black mb-4 flex items-center gap-2 text-slate-700 text-lg"><Settings size={22}/> 作業内容マスター登録</h3>
+          
+          {/* マスター・登録系はそのまま */}
+          <div className="bg-white p-6 rounded-[2rem] shadow-xl border border-slate-100">
+            <h3 className="font-black mb-4 flex items-center gap-2 text-slate-700 text-xl">作業内容マスター</h3>
             <div className="flex gap-2 mb-4">
-              <input value={newRoleItem} onChange={e=>setNewRoleItem(e.target.value)} className="flex-1 border p-3 rounded-xl text-sm font-bold shadow-sm" placeholder="作業名を入力" />
-              <button onClick={async()=>{if(!newRoleItem)return; await supabase.from('role_master').insert([{name:newRoleItem}]); setNewRoleItem(''); fetchAll();}} className="bg-slate-800 text-white px-6 rounded-xl font-bold text-sm shadow-md active:scale-95 transition-all">追加</button>
+              <input value={newRoleItem} onChange={e=>setNewRoleItem(e.target.value)} className="flex-1 border-2 p-4 rounded-2xl text-lg font-bold shadow-sm focus:border-blue-500 outline-none transition-all" placeholder="新しい作業名を入力" />
+              <button onClick={async()=>{if(!newRoleItem)return; await supabase.from('role_master').insert([{name:newRoleItem}]); setNewRoleItem(''); fetchAll();}} className="bg-slate-800 text-white px-8 rounded-2xl font-black text-lg shadow-lg active:scale-95">追加</button>
             </div>
-            <div className="flex flex-wrap gap-2 max-h-[120px] overflow-y-auto p-1">
+            <div className="flex flex-wrap gap-3 p-2">
               {roleMaster.map(r => (
-                <div key={r.id} className="bg-slate-50 border p-2 px-4 rounded-lg flex items-center gap-2 text-xs font-bold text-slate-600 shadow-sm">
-                  {r.name} <button onClick={async()=>{if(confirm('削除？')){await supabase.from('role_master').delete().eq('id',r.id); fetchAll()}}} className="text-slate-300 hover:text-red-500">×</button>
+                <div key={r.id} className="bg-slate-100 border-2 border-slate-200 p-2 px-5 rounded-xl flex items-center gap-3 text-sm font-black text-slate-700 shadow-sm hover:bg-white transition-all">
+                  {r.name} <button onClick={async()=>{if(confirm('削除？')){await supabase.from('role_master').delete().eq('id',r.id); fetchAll()}}} className="text-slate-300 hover:text-red-500 font-black">×</button>
                 </div>
               ))}
             </div>
@@ -181,46 +194,43 @@ export default function Home() {
         </div>
 
         <div className="lg:col-span-4 space-y-6">
-          {/* スタッフ登録 */}
-          <div className="bg-white p-6 rounded-[1.5rem] shadow-xl border-t-4 border-emerald-500 space-y-4">
-            <h3 className="font-black text-emerald-600 flex items-center gap-2 text-lg"><UserPlus size={22}/> スタッフ登録</h3>
+          <div className="bg-white p-6 rounded-[2rem] shadow-xl border-t-8 border-emerald-500 space-y-4">
+            <h3 className="font-black text-emerald-600 flex items-center gap-2 text-xl">スタッフ登録</h3>
             <div className="flex gap-2">
-              <input value={newStaffNameInput} onChange={e=>setNewStaffNameInput(e.target.value)} className="flex-1 border p-3 rounded-xl text-sm font-bold shadow-sm" placeholder="名前" />
-              <button onClick={async()=>{if(!newStaffNameInput)return; await supabase.from('staff_members').insert([{name:newStaffNameInput}]); setNewStaffNameInput(''); fetchAll();}} className="bg-emerald-600 text-white px-4 rounded-xl font-bold text-sm shadow-md active:scale-95 transition-all">登録</button>
+              <input value={newStaffNameInput} onChange={e=>setNewStaffNameInput(e.target.value)} className="flex-1 border-2 p-4 rounded-2xl text-lg font-bold shadow-sm outline-none focus:border-emerald-500 transition-all" placeholder="名前" />
+              <button onClick={async()=>{if(!newStaffNameInput)return; await supabase.from('staff_members').insert([{name:newStaffNameInput}]); setNewStaffNameInput(''); fetchAll();}} className="bg-emerald-600 text-white px-6 rounded-2xl font-black text-lg shadow-lg active:scale-95">登録</button>
             </div>
           </div>
 
-          {/* シフト入力 */}
-          <form onSubmit={async(e)=>{e.preventDefault(); if(!newStaffName)return; const dateStr=getJstDateString(selectedDate); await supabase.from('shifts').insert([{staff_name:newStaffName, start_time:`${dateStr}T${startTime}:00`, end_time:`${dateStr}T${endTime}:00`, role:""}]); fetchAll();}} className="bg-white p-6 rounded-[1.5rem] shadow-xl border-t-4 border-blue-600 space-y-4">
-            <h3 className="font-black text-blue-600 flex items-center gap-2 text-lg"><PlusCircle size={22}/> シフト登録</h3>
-            <div className="bg-blue-50 p-3 rounded-xl text-center font-black text-blue-800 text-sm">{getJstDateString(selectedDate)}</div>
-            <select value={newStaffName} onChange={e=>setNewStaffName(e.target.value)} className="w-full border p-3 rounded-xl bg-white text-sm font-bold shadow-sm" required>
+          <form onSubmit={async(e)=>{e.preventDefault(); if(!newStaffName)return; const dateStr=getJstDateString(selectedDate); await supabase.from('shifts').insert([{staff_name:newStaffName, start_time:`${dateStr}T${startTime}:00`, end_time:`${dateStr}T${endTime}:00`, role:""}]); fetchAll();}} className="bg-white p-6 rounded-[2rem] shadow-xl border-t-8 border-blue-600 space-y-5">
+            <h3 className="font-black text-blue-600 flex items-center gap-2 text-xl">シフト登録</h3>
+            <div className="bg-blue-50 p-4 rounded-2xl text-center font-black text-blue-800 text-lg shadow-inner">{getJstDateString(selectedDate)}</div>
+            <select value={newStaffName} onChange={e=>setNewStaffName(e.target.value)} className="w-full border-2 p-4 rounded-2xl bg-white text-lg font-black shadow-sm outline-none focus:border-blue-500" required>
               <option value="">スタッフを選択</option>
               {staffList.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
             </select>
-            <div className="grid grid-cols-2 gap-2">
-              <input type="time" value={startTime} onChange={e=>setStartTime(e.target.value)} className="w-full border p-3 rounded-xl text-sm font-bold shadow-sm" />
-              <input type="time" value={endTime} onChange={e=>setEndTime(e.target.value)} className="w-full border p-3 rounded-xl text-sm font-bold shadow-sm" />
+            <div className="grid grid-cols-2 gap-3">
+              <input type="time" value={startTime} onChange={e=>setStartTime(e.target.value)} className="w-full border-2 p-4 rounded-2xl text-lg font-black shadow-sm" />
+              <input type="time" value={endTime} onChange={e=>setEndTime(e.target.value)} className="w-full border-2 p-4 rounded-2xl text-lg font-black shadow-sm" />
             </div>
-            <button className="w-full bg-blue-600 text-white font-black py-4 rounded-xl shadow-lg hover:bg-blue-700 active:scale-95 transition-all text-sm tracking-widest">保存</button>
+            <button className="w-full bg-blue-600 text-white font-black py-5 rounded-2xl shadow-xl hover:bg-blue-700 active:scale-95 transition-all text-lg tracking-widest">この日で保存</button>
           </form>
 
-          {/* 担当割当 */}
-          <div className="bg-white p-6 rounded-[1.5rem] shadow-xl border border-slate-100 flex flex-col gap-4">
-            <h3 className="font-black text-slate-700 flex items-center gap-2 text-lg"><List size={22}/> 担当割当</h3>
-            <div className="flex flex-col gap-3 max-h-[500px] overflow-y-auto pr-1">
-              {selectedDayShifts.length === 0 ? <p className="text-center text-slate-400 py-4 text-xs italic">予定なし</p> : 
+          <div className="bg-white p-6 rounded-[2rem] shadow-xl border border-slate-100 flex flex-col gap-5">
+            <h3 className="font-black text-slate-700 flex items-center gap-2 text-xl text-center border-b pb-2">本日の担当割当</h3>
+            <div className="flex flex-col gap-4 max-h-[600px] overflow-y-auto pr-1">
+              {selectedDayShifts.length === 0 ? <p className="text-center text-slate-400 py-10 text-lg italic font-bold">予定なし</p> : 
                 selectedDayShifts.map(s => (
-                <div key={s.id} className={`p-4 rounded-2xl border-2 flex flex-col gap-3 shadow-md ${getStaffColor(s.staff_name).replace('bg-', 'border-')}`}>
-                  <div className="flex justify-between items-center font-black text-sm">{s.staff_name}
-                    <button onClick={async()=>{if(confirm('削除？')){await supabase.from('shifts').delete().eq('id',s.id);fetchAll()}}} className="text-slate-300 hover:text-red-500 transition-colors"><Trash2 size={16}/></button>
+                <div key={s.id} className={`p-5 rounded-[1.5rem] border-4 flex flex-col gap-4 shadow-lg transition-all ${getStaffColor(s.staff_name).replace('bg-', 'border-')}`}>
+                  <div className="flex justify-between items-center font-black text-lg underline decoration-4 decoration-slate-200">{s.staff_name}
+                    <button onClick={async()=>{if(confirm('削除？')){await supabase.from('shifts').delete().eq('id',s.id);fetchAll()}}} className="text-slate-300 hover:text-red-500 transition-colors"><Trash2 size={24}/></button>
                   </div>
-                  <div className="flex gap-2">
-                    <select className="flex-1 border p-2 rounded-xl text-[11px] font-bold bg-white" value={assigningShiftId === s.id ? selectedRoleForShift : (s.role || "")} onChange={(e) => { setAssigningShiftId(s.id); setSelectedRoleForShift(e.target.value); }}>
-                      <option value="">作業を選択</option>
+                  <div className="flex gap-3">
+                    <select className="flex-1 border-2 p-3 rounded-xl text-sm font-black bg-white shadow-inner" value={assigningShiftId === s.id ? selectedRoleForShift : (s.role || "")} onChange={(e) => { setAssigningShiftId(s.id); setSelectedRoleForShift(e.target.value); }}>
+                      <option value="">作業を選択...</option>
                       {roleMaster.map(r => <option key={r.id} value={r.name}>{r.name}</option>)}
                     </select>
-                    <button onClick={() => handleAssignRole(s.id)} className={`px-4 py-1 rounded-xl font-black text-xs text-white shadow-md active:scale-95 transition-all ${assigningShiftId === s.id ? 'bg-orange-500' : 'bg-slate-300'}`} disabled={assigningShiftId !== s.id}>確定</button>
+                    <button onClick={() => handleAssignRole(s.id)} className={`px-6 py-2 rounded-xl font-black text-sm text-white shadow-md active:scale-95 transition-all ${assigningShiftId === s.id ? 'bg-orange-500' : 'bg-slate-300'}`} disabled={assigningShiftId !== s.id}>確定</button>
                   </div>
                 </div>
               ))}
@@ -232,10 +242,15 @@ export default function Home() {
       <style jsx global>{`
         .custom-huge-calendar { width: 100% !important; border: none !important; }
         .custom-huge-calendar .react-calendar__month-view__days__day {
-          min-height: 140px !important; display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: flex-start !important; padding: 4px !important; border: 0.5px solid #f1f5f9 !important;
+          min-height: 160px !important; display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: flex-start !important; padding: 6px !important; border: 1px solid #f1f5f9 !important;
         }
-        .custom-huge-calendar .react-calendar__month-view__days__day abbr { font-weight: 800 !important; font-size: 16px !important; text-decoration: none !important; }
+        .custom-huge-calendar .react-calendar__month-view__days__day abbr { font-weight: 900 !important; font-size: 1.25rem !important; text-decoration: none !important; margin-bottom: 8px !important; }
         .custom-huge-calendar .react-calendar__navigation { display: none !important; }
+        .sat-bg { background-color: #f8fbff !important; }
+        .sun-bg { background-color: #fff9f9 !important; }
+        .holiday-bg { background-color: #fff5f5 !important; }
+        .react-calendar__tile--now { background: #ffffdc !important; border-radius: 12px; }
+        .react-calendar__tile--active { background: #eef6ff !important; color: inherit !important; }
       `}</style>
     </div>
   )
