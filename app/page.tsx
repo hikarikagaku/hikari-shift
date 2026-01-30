@@ -2,7 +2,8 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import Calendar from 'react-calendar'
-import { Trash2, Users, Settings, LayoutDashboard, ChevronLeft, ChevronRight, PlusCircle } from 'lucide-react'
+import { Trash2, Users, Settings, LayoutDashboard, ChevronLeft, ChevronRight, PlusCircle, Download } from 'lucide-react'
+import * as XLSX from 'xlsx'
 import 'react-calendar/dist/Calendar.css'
 import './calendar-custom.css'
 
@@ -40,7 +41,6 @@ export default function Home() {
 
   useEffect(() => { fetchAll() }, []);
 
-  // ★ 日本時間で正しく yyyy-mm-dd を取得する超重要関数
   const getJstDateString = (date: Date) => {
     const y = date.getFullYear();
     const m = String(date.getMonth() + 1).padStart(2, '0');
@@ -51,21 +51,14 @@ export default function Home() {
   const onAddShift = async (e: any) => {
     e.preventDefault();
     if (!newStaffName) return alert('スタッフを選択してください');
-    
-    // 時差の影響を受けないように yyyy-mm-dd 文字列を生成
     const dateStr = getJstDateString(selectedDate);
-    
-    const { error } = await supabase.from('shifts').insert([{ 
+    await supabase.from('shifts').insert([{ 
       staff_name: newStaffName, 
       start_time: `${dateStr}T${startTime}:00`, 
       end_time: `${dateStr}T${endTime}:00` 
     }]);
-    
-    if(error) alert("保存失敗: " + error.message);
-    else {
-      alert(`${dateStr} に登録しました`);
-      fetchAll();
-    }
+    alert(`${dateStr} に登録しました`);
+    fetchAll();
   }
 
   const handleAssignRole = async (shiftId: string) => {
@@ -74,10 +67,24 @@ export default function Home() {
     fetchAll();
   }
 
+  // ★ Excel出力機能
+  const exportToExcel = () => {
+    const data = shifts.map(s => ({
+      日付: s.start_time.split('T')[0],
+      スタッフ: s.staff_name,
+      開始: s.start_time.split('T')[1].slice(0, 5),
+      終了: s.end_time.split('T')[1].slice(0, 5),
+      作業内容: s.role || '未設定'
+    }));
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "ShiftList");
+    XLSX.writeFile(wb, `hikari_shift_${getJstDateString(new Date())}.xlsx`);
+  };
+
   const renderShiftBadges = (date: Date, isLarge: boolean) => {
     const dateStr = getJstDateString(date);
     const ds = shifts.filter(s => s.start_time.startsWith(dateStr));
-    
     return (
       <div className={`mt-1 flex flex-col gap-1 ${isLarge ? 'min-h-[150px]' : ''}`}>
         {ds.map(s => (
@@ -92,10 +99,10 @@ export default function Home() {
                   <option value="">作業選択</option>
                   {roleMaster.map(r => <option key={r.id} value={r.name}>{r.name}</option>)}
                 </select>
-                <button onClick={()=>handleAssignRole(s.id)} className="bg-white text-blue-600 rounded text-[9px] font-bold py-0.5 shadow-sm">決定</button>
+                <button onClick={()=>handleAssignRole(s.id)} className="bg-white text-blue-600 rounded text-[9px] font-bold py-0.5">決定</button>
               </div>
             ) : (
-              <div className="cursor-pointer bg-white/20 hover:bg-white/30 rounded px-1 truncate font-bold text-center py-0.5" 
+              <div className="cursor-pointer bg-white/20 hover:bg-white/30 rounded px-1 truncate font-bold text-center py-0.5 text-[8px]" 
                    onClick={()=>{setAssigningShiftId(s.id); setSelectedRoleForShift(s.role||"")}}>
                 {s.role || '📝 担当割当'}
               </div>
@@ -110,6 +117,9 @@ export default function Home() {
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900 pb-20">
       <header className="bg-white border-b p-4 flex justify-between items-center sticky top-0 z-50 shadow-sm">
         <h1 className="font-black text-blue-600 italic flex items-center gap-2"><LayoutDashboard size={20}/> HIKARI SHIFT MASTER</h1>
+        <button onClick={exportToExcel} className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-xl font-bold text-xs hover:bg-emerald-700 transition-colors shadow-md">
+          <Download size={16}/> Excel出力
+        </button>
       </header>
 
       <main className="max-w-7xl mx-auto p-4 grid lg:grid-cols-12 gap-6">
@@ -121,7 +131,7 @@ export default function Home() {
                 <span className="font-black text-blue-700 text-lg">{selectedDate.getFullYear()}年{selectedDate.getMonth()+1}月</span>
                 <button onClick={()=>setSelectedDate(new Date(selectedDate.setMonth(selectedDate.getMonth()+1)))} className="p-2 border rounded-full hover:bg-slate-50"><ChevronRight size={18}/></button>
               </div>
-              <div className="flex bg-slate-200 p-1 rounded-xl text-xs font-bold">
+              <div className="flex bg-slate-200 p-1 rounded-xl text-xs font-bold shadow-inner">
                 <button onClick={()=>setViewMode('month')} className={`px-4 py-2 rounded-lg transition-all ${viewMode==='month'?'bg-white shadow text-blue-600':'text-slate-500'}`}>月</button>
                 <button onClick={()=>setViewMode('week')} className={`px-4 py-2 rounded-lg transition-all ${viewMode==='week'?'bg-white shadow text-blue-600':'text-slate-500'}`}>週</button>
               </div>
@@ -137,7 +147,7 @@ export default function Home() {
                   const day = d.getDay();
                   d.setDate(d.getDate() - (day === 0 ? 6 : day - 1) + i);
                   return (
-                    <div key={i} onClick={()=>setSelectedDate(d)} className={`bg-white p-1 min-h-[200px] cursor-pointer transition-colors ${d.toDateString()===selectedDate.toDateString()?'bg-blue-50 ring-2 ring-inset ring-blue-400':''}`}>
+                    <div key={i} onClick={()=>setSelectedDate(d)} className={`bg-white p-1 min-h-[220px] cursor-pointer transition-colors ${d.toDateString()===selectedDate.toDateString()?'bg-blue-50 ring-2 ring-inset ring-blue-400':''}`}>
                       <div className={`text-center font-bold text-xs mb-1 ${d.toDateString()===new Date().toDateString()?'bg-blue-600 text-white w-6 h-6 rounded-full mx-auto flex items-center justify-center':''}`}>{d.getDate()}</div>
                       {renderShiftBadges(d, true)}
                     </div>
@@ -148,9 +158,9 @@ export default function Home() {
           </div>
 
           <div className="bg-white p-6 rounded-3xl border shadow-lg border-blue-100">
-            <h3 className="font-bold mb-4 flex items-center gap-2 text-blue-600"><Settings size={18}/> 担当作業マスター登録</h3>
+            <h3 className="font-bold mb-4 flex items-center gap-2 text-blue-600 text-sm"><Settings size={18}/> 担当作業マスター登録</h3>
             <div className="flex gap-2 mb-4">
-              <input value={newRoleItem} onChange={e=>setNewRoleItem(e.target.value)} className="flex-1 border p-2 rounded-xl text-sm outline-none focus:ring-2 ring-blue-200" placeholder="1号機削り、2号機削り など" />
+              <input value={newRoleItem} onChange={e=>setNewRoleItem(e.target.value)} className="flex-1 border p-2 rounded-xl text-sm outline-none focus:ring-2 ring-blue-100" placeholder="1号機削り、2号機削り など" />
               <button onClick={async()=>{
                 if(!newRoleItem) return;
                 await supabase.from('role_master').insert([{name:newRoleItem}]);
@@ -160,7 +170,7 @@ export default function Home() {
             <div className="flex flex-wrap gap-2">
               {roleMaster.map(r => (
                 <div key={r.id} className="bg-blue-50 border border-blue-100 p-2 px-3 rounded-lg flex items-center gap-2 text-[10px] font-bold text-blue-700 shadow-sm">
-                  {r.name} <button onClick={async()=>{if(confirm('削除？')){await supabase.from('role_master').delete().eq('id',r.id); fetchAll()}}} className="text-blue-300 hover:text-red-500 ml-1 text-xs">×</button>
+                  {r.name} <button onClick={async()=>{if(confirm('削除？')){await supabase.from('role_master').delete().eq('id',r.id); fetchAll()}}} className="text-blue-300 hover:text-red-500 font-normal ml-1">×</button>
                 </div>
               ))}
             </div>
@@ -174,7 +184,7 @@ export default function Home() {
               {getJstDateString(selectedDate)} ({['日','月','火','水','木','金','土'][selectedDate.getDay()]})
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] font-bold text-slate-400 ml-1">スタッフを選択</label>
+              <label className="text-[10px] font-bold text-slate-400 ml-1 font-bold">スタッフ名を選択</label>
               <select value={newStaffName} onChange={e=>setNewStaffName(e.target.value)} className="w-full border p-3 rounded-2xl bg-white text-sm outline-none shadow-sm focus:ring-2 ring-blue-100" required>
                 <option value="">-- 未選択 --</option>
                 {staffList.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
@@ -191,12 +201,21 @@ export default function Home() {
               </div>
             </div>
             <button className="w-full bg-blue-600 text-white font-black py-4 rounded-2xl shadow-lg active:scale-95 transition-all text-sm tracking-widest">
-              シフト登録
+              登録
             </button>
           </form>
+          
+          <div className="bg-white p-5 rounded-3xl border shadow-sm h-60 overflow-y-auto">
+            <h3 className="text-xs font-bold text-slate-400 mb-3 border-b pb-2 italic">本日の登録履歴（削除可）</h3>
+            {shifts.filter(s => s.start_time.startsWith(getJstDateString(selectedDate))).map(s => (
+              <div key={s.id} className="flex justify-between items-center p-2 bg-slate-50 rounded-xl mb-2 border text-[11px] font-bold">
+                <span>{s.staff_name} ({s.role || '未'})</span>
+                <button onClick={async()=>{if(confirm('削除しますか？')){await supabase.from('shifts').delete().eq('id',s.id);fetchAll()}}} className="text-slate-300 hover:text-red-500"><Trash2 size={14}/></button>
+              </div>
+            ))}
+          </div>
         </div>
       </main>
     </div>
-    
   )
 }
