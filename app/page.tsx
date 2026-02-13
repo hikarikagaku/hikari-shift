@@ -10,6 +10,16 @@ import 'react-calendar/dist/Calendar.css'
 // --- Supabase Client ---
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
 
+// スタッフ名から固定の色を生成する関数
+const getStaffColor = (name: string) => {
+  const colors = ['#5b8fff', '#34d399', '#f87171', '#fbbf24', '#a78bfa', '#fb923c', '#38bdf8', '#e879f9'];
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return colors[Math.abs(hash) % colors.length];
+}
+
 export default function Home() {
   const [shifts, setShifts] = useState<any[]>([]);
   const [staffList, setStaffList] = useState<any[]>([]);
@@ -103,7 +113,7 @@ export default function Home() {
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "SHIFTS");
-    XLSX.writeFile(wb, `shift_${getJstDateString(new Date())}.xlsx`);
+    XLSX.writeFile(wb, `shift_export.xlsx`);
   };
 
   const renderShiftBadges = (date: Date) => {
@@ -112,8 +122,8 @@ export default function Home() {
     return (
       <div className="shift-chips-container">
         {ds.slice(0, 3).map(s => (
-          <div key={s.id} className="shift-chip">
-            <span className="dot"></span>
+          <div key={s.id} className="shift-chip" style={{ color: getStaffColor(s.staff_name), background: `${getStaffColor(s.staff_name)}15` }}>
+            <span className="dot" style={{ background: getStaffColor(s.staff_name) }}></span>
             {s.staff_name.split(' ')[0]}
           </div>
         ))}
@@ -122,11 +132,12 @@ export default function Home() {
     );
   }
 
+  const selectedDayShifts = shifts.filter(s => s.start_time.startsWith(getJstDateString(selectedDate)));
+
   return (
     <div className="app-container">
       <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&family=DM+Mono:wght@400;500&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
       
-      {/* HEADER */}
       <header>
         <div className="logo">SHIFT</div>
         <div className="header-nav">
@@ -137,7 +148,6 @@ export default function Home() {
       </header>
 
       <main className="main-layout">
-        {/* LEFT AREA */}
         <div className="calendar-area">
           <div className="cal-header">
             <div className="cal-nav">
@@ -173,10 +183,9 @@ export default function Home() {
                   const day = d.getDay();
                   const diff = i - (day === 0 ? 6 : day - 1);
                   d.setDate(selectedDate.getDate() + diff);
-                  const isToday = d.toDateString() === new Date().toDateString();
                   return (
                     <div key={i} onClick={() => setSelectedDate(d)} className={`cal-cell ${getDayClass(d)} ${getJstDateString(d) === getJstDateString(selectedDate) ? 'selected' : ''}`}>
-                       <span className={`cal-date ${isToday ? 'today-num' : ''}`}>{d.getDate()}</span>
+                       <span className={`cal-date ${d.toDateString() === new Date().toDateString() ? 'today-num' : ''}`}>{d.getDate()}</span>
                        {renderShiftBadges(d)}
                     </div>
                   )
@@ -185,28 +194,22 @@ export default function Home() {
             )}
           </div>
 
-          {/* HISTORY */}
           <div className="history-area">
-            <div className="history-header">
-              <span className="history-title">入力履歴</span>
-            </div>
+            <div className="history-header"><span className="history-title">入力履歴</span></div>
             <div className="history-table-wrap">
               <table className="history-table">
-                <thead>
-                  <tr>
-                    <th>日付</th>
-                    <th>スタッフ</th>
-                    <th>作業内容</th>
-                    <th>時間</th>
-                    <th></th>
-                  </tr>
-                </thead>
+                <thead><tr><th>日付</th><th>スタッフ</th><th>作業内容</th><th>時間</th><th></th></tr></thead>
                 <tbody>
                   {shifts.map(s => (
                     <tr key={s.id}>
                       <td className="td-date">{s.start_time.split('T')[0]}</td>
-                      <td><span className="staff-badge-small"><span className="dot"></span>{s.staff_name}</span></td>
-                      <td><span className="work-badge-small">{s.role || '---'}</span></td>
+                      <td>
+                        <span className="staff-badge-small">
+                          <span className="dot" style={{ background: getStaffColor(s.staff_name) }}></span>
+                          {s.staff_name}
+                        </span>
+                      </td>
+                      <td><span className="work-badge-small" style={{ color: '#5b8fff' }}>{s.role || '---'}</span></td>
                       <td className="td-time">{s.start_time.split('T')[1].slice(0,5)}–{s.end_time.split('T')[1].slice(0,5)}</td>
                       <td><button onClick={() => deleteShift(s.id)} className="del-btn">✕</button></td>
                     </tr>
@@ -217,14 +220,12 @@ export default function Home() {
           </div>
         </div>
 
-        {/* SIDEBAR */}
         <aside className="sidebar">
           <div className="sidebar-section">
             <div className="section-title">作業内容マスター <button className="add-btn" onClick={()=>{const n=prompt('作業名'); if(n) supabase.from('role_master').insert([{name:n}]).then(fetchAll)}}>+</button></div>
             <div className="item-list">
               {roleMaster.map(r => (
-                <div key={r.id} className="item-row">
-                  <span className="dot"></span>{r.name}
+                <div key={r.id} className="item-row"><span className="dot"></span>{r.name}
                   <button className="del-btn" onClick={()=>supabase.from('role_master').delete().eq('id',r.id).then(fetchAll)}>✕</button>
                 </div>
               ))}
@@ -236,7 +237,8 @@ export default function Home() {
             <div className="staff-grid">
               {staffList.map(s => (
                 <div key={s.id} className="staff-pill">
-                  <div className="avatar">{s.name[0]}</div>{s.name}
+                  <div className="avatar" style={{ background: getStaffColor(s.name) }}>{s.name[0]}</div>
+                  {s.name}
                   <button onClick={()=>supabase.from('staff_members').delete().eq('id',s.id).then(fetchAll)}>×</button>
                 </div>
               ))}
@@ -265,7 +267,10 @@ export default function Home() {
             <div className="assignment-list">
               {selectedDayShifts.map(s => (
                 <div key={s.id} className="assign-item">
-                  <div className="assign-info"><strong>{s.staff_name}</strong><span>{s.start_time.split('T')[1].slice(0,5)}–{s.end_time.split('T')[1].slice(0,5)}</span></div>
+                  <div className="assign-info">
+                    <strong style={{ color: getStaffColor(s.staff_name) }}>{s.staff_name}</strong>
+                    <span>{s.start_time.split('T')[1].slice(0,5)}–{s.end_time.split('T')[1].slice(0,5)}</span>
+                  </div>
                   <div className="assign-action">
                     <select value={assigningShiftId === s.id ? selectedRoleForShift : (s.role || "")} onChange={(e) => { setAssigningShiftId(s.id); setSelectedRoleForShift(e.target.value); }}>
                       <option value="">作業を選択</option>
@@ -287,13 +292,11 @@ export default function Home() {
           --text: #e8eaf0; --text-muted: #6b7280; --text-dim: #9ca3af;
         }
         body { background: var(--bg); color: var(--text); margin: 0; font-family: 'Noto Sans JP', sans-serif; }
-        
         header { display: flex; align-items: center; justify-content: space-between; padding: 0 2rem; height: 60px; border-bottom: 1px solid var(--border); background: rgba(13,15,20,0.9); backdrop-filter: blur(12px); position: sticky; top: 0; z-index: 100; }
         .logo { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.3rem; letter-spacing: 0.12em; background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
         .nav-btn { background: none; border: 1px solid transparent; color: var(--text-dim); padding: 0.4rem 1rem; border-radius: 6px; font-size: 0.82rem; cursor: pointer; }
         .nav-btn.active { background: var(--surface2); color: var(--accent); border-color: var(--border); }
         .export-btn { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: white; border: none; padding: 0.45rem 1.1rem; border-radius: 6px; font-size: 0.82rem; font-weight: 500; cursor: pointer; }
-        
         .main-layout { display: grid; grid-template-columns: 1fr 320px; min-height: calc(100vh - 60px); }
         .calendar-area { padding: 1.5rem 2rem; border-right: 1px solid var(--border); }
         .cal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; }
@@ -303,73 +306,47 @@ export default function Home() {
         .view-toggle { display: flex; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
         .view-toggle button { background: none; border: none; color: var(--text-dim); padding: 0.35rem 0.8rem; font-size: 0.78rem; cursor: pointer; }
         .view-toggle button.active { background: var(--surface2); color: var(--accent); }
-
-        /* CALENDAR OVERRIDE */
-        .react-calendar { width: 100% !important; background: transparent !important; border: none !important; font-family: inherit !important; }
+        .react-calendar { width: 100% !important; background: transparent !important; border: none !important; }
         .react-calendar__month-view__weekdays { display: grid !important; grid-template-columns: repeat(7, 1fr) !important; text-align: center; font-family: 'DM Mono', monospace; font-size: 0.72rem; color: var(--text-muted); margin-bottom: 10px; }
         .react-calendar__month-view__days { display: grid !important; grid-template-columns: repeat(7, 1fr) !important; gap: 4px !important; }
         .react-calendar__tile { background: var(--surface) !important; border: 1px solid var(--border) !important; border-radius: 6px !important; min-height: 100px !important; padding: 6px !important; text-align: left !important; display: flex !important; flex-direction: column !important; align-items: flex-start !important; }
-        .react-calendar__tile:hover { background: var(--surface2) !important; border-color: var(--accent) !important; }
-        .react-calendar__tile--now { border-color: var(--accent) !important; }
-        .react-calendar__tile--active { background: rgba(91,143,255,0.1) !important; border-color: var(--accent) !important; }
-        .react-calendar__tile abbr { font-family: 'DM Mono', monospace; font-size: 0.8rem; color: var(--text-dim); text-decoration: none !important; }
-        
-        /* WEEK VIEW CUSTOM */
+        .react-calendar__tile abbr { text-decoration: none !important; font-family: 'DM Mono', monospace; font-size: 0.8rem; color: var(--text-dim); }
         .week-grid-custom { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
         .weekday-label { text-align: center; font-family: 'DM Mono', monospace; font-size: 0.72rem; color: var(--text-muted); padding: 0.5rem 0; }
         .cal-cell { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; min-height: 450px; padding: 10px; cursor: pointer; }
         .cal-cell.selected { border-color: var(--accent); background: rgba(91,143,255,0.05); }
         .cal-date { font-family: 'DM Mono', monospace; font-size: 0.8rem; color: var(--text-dim); margin-bottom: 8px; display: block; }
         .today-num { background: var(--accent); color: white !important; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
-
         .sat abbr, .sat { color: var(--accent) !important; }
         .sun abbr, .sun { color: #f87171 !important; }
-
-        /* SHIFT CHIPS */
         .shift-chips-container { display: flex; flex-direction: column; gap: 3px; width: 100%; margin-top: 4px; }
-        .shift-chip { display: flex; align-items: center; gap: 4px; font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; background: rgba(91,143,255,0.1); color: var(--accent); white-space: nowrap; overflow: hidden; }
-        .shift-chip .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); }
-        .more-count { font-size: 0.65rem; color: var(--text-muted); padding-left: 4px; }
-
-        /* HISTORY */
-        .history-area { mt: 2rem; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); overflow: hidden; margin-top: 2rem; }
+        .shift-chip { display: flex; align-items: center; gap: 4px; font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; white-space: nowrap; overflow: hidden; }
+        .shift-chip .dot { width: 5px; height: 5px; border-radius: 50%; }
+        .history-area { border: 1px solid var(--border); border-radius: 10px; background: var(--surface); overflow: hidden; margin-top: 2rem; }
         .history-header { padding: 1rem; border-bottom: 1px solid var(--border); }
         .history-title { font-family: 'Syne', sans-serif; font-size: 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.1em; }
         .history-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
         .history-table th { text-align: left; padding: 0.75rem 1rem; color: var(--text-muted); font-family: 'DM Mono', monospace; font-size: 0.65rem; border-bottom: 1px solid var(--border); }
         .history-table td { padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); }
-        .td-date, .td-time { font-family: 'DM Mono', monospace; color: var(--text-dim); }
         .staff-badge-small { display: inline-flex; align-items: center; gap: 6px; background: var(--surface2); padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; }
-        .work-badge-small { color: var(--accent); font-weight: bold; }
-
-        /* SIDEBAR */
-        .sidebar { display: flex; flex-direction: column; }
+        .staff-badge-small .dot { width: 6px; height: 6px; border-radius: 50%; }
         .sidebar-section { padding: 1.5rem; border-bottom: 1px solid var(--border); }
         .section-title { font-family: 'Syne', sans-serif; font-size: 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 1.2rem; display: flex; justify-content: space-between; align-items: center; }
         .add-btn { background: var(--surface2); border: 1px solid var(--border); color: var(--accent); width: 20px; height: 20px; border-radius: 4px; cursor: pointer; }
         .item-row { display: flex; align-items: center; gap: 0.8rem; padding: 0.5rem; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; font-size: 0.8rem; margin-bottom: 0.4rem; }
-        .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
-        .staff-grid { display: flex; flex-wrap: wrap; gap: 0.5rem; }
         .staff-pill { display: flex; align-items: center; gap: 0.5rem; background: var(--surface); border: 1px solid var(--border); padding: 0.3rem 0.7rem; border-radius: 20px; font-size: 0.75rem; }
-        .avatar { width: 18px; height: 18px; background: var(--accent); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.6rem; }
-        
+        .avatar { width: 18px; height: 18px; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.6rem; font-weight: bold; }
         .bg-form { background: rgba(91,143,255,0.03); }
-        .date-label { font-family: 'DM Mono', monospace; font-size: 0.8rem; color: var(--accent); margin-bottom: 1rem; }
         .form label { display: block; font-size: 0.7rem; color: var(--text-muted); margin-bottom: 0.4rem; }
         .form select, .form input { width: 100%; background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 0.6rem; border-radius: 6px; font-size: 0.8rem; margin-bottom: 0.8rem; outline: none; }
-        .input-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; }
         .form-btn { width: 100%; background: linear-gradient(135deg, var(--accent), var(--accent2)); border: none; color: white; padding: 0.7rem; border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 0.85rem; }
-        
         .assign-item { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 0.8rem; margin-bottom: 0.6rem; }
         .assign-info { display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 0.6rem; }
-        .assign-info span { font-family: 'DM Mono', monospace; color: var(--text-muted); }
         .assign-action { display: flex; gap: 0.5rem; }
         .assign-action select { flex: 1; background: var(--surface2); border: 1px solid var(--border); color: var(--text); font-size: 0.75rem; padding: 0.3rem; border-radius: 4px; }
         .assign-action button { background: var(--surface2); border: 1px solid var(--border); color: var(--text-muted); font-size: 0.7rem; padding: 0 0.8rem; border-radius: 4px; cursor: pointer; }
         .assign-action button.active { background: var(--accent); color: white; border-color: var(--accent); }
-        
         .del-btn { background: none; border: none; color: var(--text-muted); cursor: pointer; }
-        .del-btn:hover { color: #f87171; }
       `}</style>
     </div>
   )
