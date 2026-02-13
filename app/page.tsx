@@ -2,12 +2,11 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import Calendar from 'react-calendar'
-import { Trash2, LayoutDashboard, ChevronLeft, ChevronRight, Download, X, PlusCircle, Users, Settings, History, Calendar as CalIcon } from 'lucide-react'
+import { Trash2, LayoutDashboard, ChevronLeft, ChevronRight, Download, PlusCircle, Users, Settings, History, Calendar as CalIcon } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import HolidayJp from '@holiday-jp/holiday_jp'
 import 'react-calendar/dist/Calendar.css'
 
-// --- Supabase Client ---
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
 
 const getStaffColor = (name: string) => {
@@ -29,16 +28,12 @@ export default function Home() {
   const [newStaffName, setNewStaffName] = useState(''); 
   const [startTime, setStartTime] = useState('08:30');
   const [endTime, setEndTime] = useState('17:30');
-  const [assigningShiftId, setAssigningShiftId] = useState<string | null>(null);
-  const [selectedRoleForShift, setSelectedRoleForShift] = useState("");
 
   const fetchAll = async () => {
     const { data: s } = await supabase.from('shifts').select('*').order('start_time', { ascending: false });
     const { data: m } = await supabase.from('staff_members').select('*').order('name');
     const { data: r } = await supabase.from('role_master').select('*').order('name');
-    if (s) setShifts(s); 
-    if (m) setStaffList(m); 
-    if (r) setRoleMaster(r);
+    if (s) setShifts(s); if (m) setStaffList(m); if (r) setRoleMaster(r);
   }
 
   useEffect(() => { fetchAll() }, []);
@@ -62,25 +57,13 @@ export default function Home() {
     setSelectedDate(nextDate);
   };
 
-  const onAddShift = async (e: any) => {
-    e.preventDefault();
-    if (!newStaffName) return;
-    const dateStr = getJstDateString(selectedDate);
-    await supabase.from('shifts').insert([{ 
-      staff_name: newStaffName, 
-      start_time: `${dateStr}T${startTime}:00`, 
-      end_time: `${dateStr}T${endTime}:00`,
-      role: "" 
-    }]);
-    fetchAll();
-    if(window.innerWidth < 768) setMobileTab('cal');
-  }
-
-  const deleteShift = async (id: string) => {
-    if(!confirm('削除しますか？')) return;
-    await supabase.from('shifts').delete().eq('id', id);
-    fetchAll();
-  }
+  const exportCSV = () => {
+    const header = '日付,スタッフ,作業内容,開始,終了\n';
+    const rows = shifts.map(s => `${s.start_time.split('T')[0]},${s.staff_name},${s.role || ''},${s.start_time.split('T')[1].slice(0,5)},${s.end_time.split('T')[1].slice(0,5)}`).join('\n');
+    const blob = new Blob(['\uFEFF' + header + rows], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'shift.csv'; a.click();
+  };
 
   const renderShiftBadges = (date: Date) => {
     const dateStr = getJstDateString(date);
@@ -88,7 +71,7 @@ export default function Home() {
     return (
       <div className="shift-chips-container">
         {ds.slice(0, 3).map(s => (
-          <div key={s.id} className="shift-chip" style={{ color: getStaffColor(s.staff_name), background: `${getStaffColor(s.staff_name)}15` }}>
+          <div key={s.id} className="shift-chip" style={{ color: getStaffColor(s.staff_name), background: `${getStaffColor(s.staff_name)}22` }}>
             <span className="dot" style={{ background: getStaffColor(s.staff_name) }}></span>
             {s.staff_name.split(' ')[0]}
           </div>
@@ -97,56 +80,53 @@ export default function Home() {
     );
   }
 
-  const selectedDayShifts = shifts.filter(s => s.start_time.startsWith(getJstDateString(selectedDate)));
-
   return (
-    <div className="app-container">
+    <div className="app-shell">
       <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&family=DM+Mono:wght@400;500&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
       
-      <header className="desktop-header">
+      {/* ── HEADER ── */}
+      <header className="site-header">
         <div className="logo">SHIFT</div>
-        <div className="header-nav">
-          <button className={`nav-btn ${viewMode === 'month' ? 'active' : ''}`} onClick={() => setViewMode('month')}>月表示</button>
-          <button className={`nav-btn ${viewMode === 'week' ? 'active' : ''}`} onClick={() => setViewMode('week')}>週表示</button>
-        </div>
-        <button className="export-btn" onClick={() => {}}>📥 CSV出力</button>
+        <button className="export-btn" onClick={exportCSV}>📥 CSV出力</button>
       </header>
 
-      <main className="main-layout">
-        {/* LEFT AREA / MAIN CONTENT */}
-        <div className={`calendar-area ${(mobileTab === 'cal' || mobileTab === 'history') ? 'block' : 'hidden md:block'}`}>
-          
+      <main className="main-content">
+        {/* LEFT AREA */}
+        <div className={`content-section ${mobileTab === 'cal' || mobileTab === 'history' ? 'active' : 'hidden md:block'}`}>
           {mobileTab === 'cal' && (
-            <>
-              <div className="cal-header">
-                <div className="cal-nav">
-                  <button onClick={() => handleMove(-1)}><ChevronLeft size={16}/></button>
-                  <span className="cal-title">{viewMode === 'month' ? `${activeStartDate.getFullYear()}年${activeStartDate.getMonth() + 1}月` : `${selectedDate.getMonth() + 1}月${selectedDate.getDate()}日の週`}</span>
-                  <button onClick={() => handleMove(1)}><ChevronRight size={16}/></button>
-                </div>
+            <div className="view-container">
+              <div className="cal-navigation">
+                <button onClick={() => handleMove(-1)}><ChevronLeft size={18}/></button>
+                <span className="cal-month-title">{viewMode === 'month' ? `${activeStartDate.getFullYear()}年${activeStartDate.getMonth() + 1}月` : `${selectedDate.getMonth() + 1}月${selectedDate.getDate()}日の週`}</span>
+                <button onClick={() => handleMove(1)}><ChevronRight size={18}/></button>
               </div>
 
-              <div className="grid-container">
+              <div className="calendar-box">
                 {viewMode === 'month' ? (
                   <Calendar 
                     onChange={(v: any) => setSelectedDate(v)} 
                     activeStartDate={activeStartDate}
                     value={selectedDate} 
                     tileContent={({ date }) => renderShiftBadges(date)} 
-                    tileClassName={({ date }) => HolidayJp.isHoliday(date) || date.getDay() === 0 ? 'sun' : date.getDay() === 6 ? 'sat' : ''}
+                    tileClassName={({ date }) => {
+                        const dateStr = getJstDateString(date);
+                        const isSelected = dateStr === getJstDateString(selectedDate);
+                        const holidayClass = HolidayJp.isHoliday(date) || date.getDay() === 0 ? 'sun' : date.getDay() === 6 ? 'sat' : '';
+                        return `cal-tile ${holidayClass} ${isSelected ? 'selected' : ''}`;
+                    }}
                     locale="ja-JP" 
-                    className="cal-grid-override" 
+                    className="custom-calendar-root" 
                   />
                 ) : (
-                  <div className="week-grid-custom">
+                  <div className="week-view-grid">
                     {[0,1,2,3,4,5,6].map(i => {
                       const d = new Date(selectedDate);
                       const day = d.getDay();
                       const diff = i - (day === 0 ? 6 : day - 1);
                       d.setDate(selectedDate.getDate() + diff);
                       return (
-                        <div key={i} onClick={() => setSelectedDate(d)} className={`cal-cell ${getJstDateString(d) === getJstDateString(selectedDate) ? 'selected' : ''}`}>
-                           <span className={`cal-date ${d.toDateString() === new Date().toDateString() ? 'today-num' : ''}`}>{d.getDate()}</span>
+                        <div key={i} onClick={() => setSelectedDate(d)} className={`cal-tile week-tile ${HolidayJp.isHoliday(d) || d.getDay() === 0 ? 'sun' : d.getDay() === 6 ? 'sat' : ''} ${getJstDateString(d) === getJstDateString(selectedDate) ? 'selected' : ''}`}>
+                           <span className={`date-num ${d.toDateString() === new Date().toDateString() ? 'today' : ''}`}>{d.getDate()}</span>
                            {renderShiftBadges(d)}
                         </div>
                       )
@@ -154,56 +134,95 @@ export default function Home() {
                   </div>
                 )}
               </div>
-            </>
+            </div>
           )}
 
-          {(mobileTab === 'history' || window.innerWidth >= 768) && (
-            <div className="history-area mt-8 border border-[#252a38] rounded-xl overflow-hidden bg-[#151820]">
-              <div className="history-header p-4 border-b border-[#252a38]"><span className="history-title">入力履歴</span></div>
-              <table className="history-table w-full">
-                <tbody className="divide-y divide-[#252a38]">
-                  {shifts.map(s => (
-                    <tr key={s.id}>
-                      <td className="p-3 font-mono text-[10px] text-[#9ca3af]">{s.start_time.split('T')[0]}</td>
-                      <td className="p-3">
-                        <span className="flex items-center gap-2 text-[11px]">
-                          <span className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] text-white" style={{ background: getStaffColor(s.staff_name) }}>{s.staff_name[0]}</span>
-                          {s.staff_name}
-                        </span>
-                      </td>
-                      <td className="p-3 text-blue-400 font-bold text-[10px]">{s.role || '---'}</td>
-                      <td className="p-3 text-right"><button onClick={() => deleteShift(s.id)} className="text-[#6b7280]">✕</button></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          {mobileTab === 'history' && (
+            <div className="history-pane">
+              <div className="pane-header"><span className="pane-label">入力履歴</span></div>
+              <div className="table-wrapper">
+                <table className="modern-table">
+                  <thead>
+                    <tr><th>Date</th><th>Staff</th><th>Work</th><th>Time</th><th></th></tr>
+                  </thead>
+                  <tbody>
+                    {shifts.map(s => (
+                      <tr key={s.id}>
+                        <td className="font-mono text-xs opacity-50">{s.start_time.split('T')[0]}</td>
+                        <td>
+                          <div className="staff-cell">
+                            <span className="avatar-small" style={{ background: getStaffColor(s.staff_name) }}>{s.staff_name[0]}</span>
+                            {s.staff_name}
+                          </div>
+                        </td>
+                        <td><span className="role-tag" style={{ color: getStaffColor(s.staff_name) }}>{s.role || '---'}</span></td>
+                        <td className="font-mono text-[10px] opacity-60">{s.start_time.split('T')[1].slice(0,5)}–{s.end_time.split('T')[1].slice(0,5)}</td>
+                        <td><button onClick={async () => { if(confirm('削除？')) { await supabase.from('shifts').delete().eq('id', s.id); fetchAll(); }}} className="opacity-30 hover:opacity-100 transition-opacity">✕</button></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </div>
 
-        {/* SIDEBAR / MOBILE TABS */}
-        <aside className={`sidebar ${(mobileTab !== 'cal' && mobileTab !== 'history') ? 'block' : 'hidden md:block'}`}>
-          {(mobileTab === 'work' || window.innerWidth >= 768) && (
-            <div className="sidebar-section p-6">
-              <div className="section-title">作業マスター <button onClick={()=>{const n=prompt('作業名'); n && supabase.from('role_master').insert([{name:n}]).then(fetchAll)}}>+</button></div>
-              <div className="space-y-2">
-                {roleMaster.map(r => (
-                  <div key={r.id} className="item-row p-2 bg-[#151820] border border-[#252a38] rounded-lg text-xs flex justify-between">
-                    <span>{r.name}</span>
-                    <button onClick={()=>supabase.from('role_master').delete().eq('id',r.id).then(fetchAll)}>✕</button>
+        {/* SIDEBAR TABS */}
+        <aside className={`sidebar-section ${mobileTab !== 'cal' && mobileTab !== 'history' ? 'active' : 'hidden md:block'}`}>
+          {mobileTab === 'reg' && (
+            <div className="pane-card">
+              <div className="pane-header"><span className="pane-label">シフト登録</span></div>
+              <div className="selected-date-badge">{getJstDateString(selectedDate)}</div>
+              <form onSubmit={async (e) => {
+                  e.preventDefault();
+                  if (!newStaffName) return;
+                  const dateStr = getJstDateString(selectedDate);
+                  await supabase.from('shifts').insert([{ staff_name: newStaffName, start_time: `${dateStr}T${startTime}:00`, end_time: `${dateStr}T${endTime}:00`, role: "" }]);
+                  fetchAll();
+                  setMobileTab('cal');
+              }} className="pane-form">
+                <div className="field-group">
+                  <label>スタッフ</label>
+                  <select value={newStaffName} onChange={e=>setNewStaffName(e.target.value)}>
+                    <option value="">選択してください</option>
+                    {staffList.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
+                  </select>
+                </div>
+                <div className="field-row">
+                  <div className="field-group"><label>開始</label><input type="time" value={startTime} onChange={e=>setStartTime(e.target.value)} /></div>
+                  <div className="field-group"><label>終了</label><input type="time" value={endTime} onChange={e=>setEndTime(e.target.value)} /></div>
+                </div>
+                <button className="action-btn-main">保存する</button>
+              </form>
+
+              <div className="daily-assign mt-10">
+                <div className="pane-label mb-4 opacity-50">本日の担当割当</div>
+                {selectedDayShifts.map(s => (
+                  <div key={s.id} className="assign-row">
+                    <div className="assign-staff">
+                      <span className="avatar-small" style={{ background: getStaffColor(s.staff_name) }}>{s.staff_name[0]}</span>
+                      {s.staff_name}
+                    </div>
+                    <select value={s.role || ""} onChange={async (e) => { await supabase.from('shifts').update({role: e.target.value}).eq('id', s.id); fetchAll(); }}>
+                      <option value="">作業を選択</option>
+                      {roleMaster.map(r => <option key={r.id} value={r.name}>{r.name}</option>)}
+                    </select>
                   </div>
                 ))}
               </div>
             </div>
           )}
 
-          {(mobileTab === 'staff' || window.innerWidth >= 768) && (
-            <div className="sidebar-section p-6">
-              <div className="section-title">スタッフ <button onClick={()=>{const n=prompt('名前'); n && supabase.from('staff_members').insert([{name:n}]).then(fetchAll)}}>+</button></div>
-              <div className="flex flex-wrap gap-2">
+          {mobileTab === 'staff' && (
+            <div className="pane-card">
+              <div className="pane-header flex justify-between">
+                <span className="pane-label">スタッフ管理</span>
+                <button className="add-icon-btn" onClick={async () => { const n = prompt('名前'); if(n) { await supabase.from('staff_members').insert([{name: n}]); fetchAll(); }}}>+</button>
+              </div>
+              <div className="flex flex-wrap gap-2 mt-4">
                 {staffList.map(s => (
-                  <div key={s.id} className="staff-pill flex items-center gap-2 bg-[#151820] border border-[#252a38] px-3 py-1.5 rounded-full text-xs">
-                    <div className="avatar w-5 h-5 rounded-full flex items-center justify-center text-white" style={{ background: getStaffColor(s.name) }}>{s.name[0]}</div>
+                  <div key={s.id} className="staff-badge">
+                    <span className="avatar-small" style={{ background: getStaffColor(s.name) }}>{s.name[0]}</span>
                     {s.name}
                   </div>
                 ))}
@@ -211,30 +230,18 @@ export default function Home() {
             </div>
           )}
 
-          {(mobileTab === 'reg' || window.innerWidth >= 768) && (
-            <div className="sidebar-section p-6">
-              <div className="section-title text-blue-400">シフト登録 - {getJstDateString(selectedDate)}</div>
-              <form onSubmit={onAddShift} className="space-y-4">
-                <select value={newStaffName} onChange={e=>setNewStaffName(e.target.value)} className="w-full bg-[#151820] border border-[#252a38] p-3 rounded-lg text-white">
-                  <option value="">スタッフを選択</option>
-                  {staffList.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
-                </select>
-                <div className="grid grid-cols-2 gap-2">
-                  <input type="time" value={startTime} onChange={e=>setStartTime(e.target.value)} className="bg-[#151820] border border-[#252a38] p-3 rounded-lg text-white" />
-                  <input type="time" value={endTime} onChange={e=>setEndTime(e.target.value)} className="bg-[#151820] border border-[#252a38] p-3 rounded-lg text-white" />
-                </div>
-                <button className="w-full bg-blue-600 py-3 rounded-lg font-bold">保存する</button>
-              </form>
-              
-              <div className="mt-8 space-y-3">
-                <div className="text-[10px] font-bold text-slate-500 uppercase">今日の担当割当</div>
-                {selectedDayShifts.map(s => (
-                  <div key={s.id} className="p-3 bg-[#151820] border border-[#252a38] rounded-xl flex items-center justify-between">
-                    <span className="text-xs font-bold">{s.staff_name}</span>
-                    <select value={s.role || ""} onChange={(e) => supabase.from('shifts').update({role:e.target.value}).eq('id',s.id).then(fetchAll)} className="bg-[#1c2030] text-[10px] p-1 rounded">
-                      <option value="">作業割当</option>
-                      {roleMaster.map(r => <option key={r.id} value={r.name}>{r.name}</option>)}
-                    </select>
+          {mobileTab === 'work' && (
+            <div className="pane-card">
+              <div className="pane-header flex justify-between">
+                <span className="pane-label">作業マスター</span>
+                <button className="add-icon-btn" onClick={async () => { const n = prompt('作業名'); if(n) { await supabase.from('role_master').insert([{name: n}]); fetchAll(); }}}>+</button>
+              </div>
+              <div className="space-y-2 mt-4">
+                {roleMaster.map(r => (
+                  <div key={r.id} className="role-item">
+                    <span className="role-dot"></span>
+                    {r.name}
+                    <button onClick={async () => { if(confirm('削除？')) { await supabase.from('role_master').delete().eq('id', r.id); fetchAll(); }}} className="ml-auto opacity-20">✕</button>
                   </div>
                 ))}
               </div>
@@ -243,43 +250,78 @@ export default function Home() {
         </aside>
       </main>
 
-      {/* MOBILE BOTTOM NAV */}
-      <nav className="mobile-nav md:hidden">
+      {/* BOTTOM NAV */}
+      <nav className="bottom-bar">
         <button onClick={() => setMobileTab('cal')} className={mobileTab === 'cal' ? 'active' : ''}><CalIcon size={20}/><span>カレンダー</span></button>
         <button onClick={() => setMobileTab('reg')} className={mobileTab === 'reg' ? 'active' : ''}><PlusCircle size={20}/><span>登録</span></button>
         <button onClick={() => setMobileTab('staff')} className={mobileTab === 'staff' ? 'active' : ''}><Users size={20}/><span>スタッフ</span></button>
         <button onClick={() => setMobileTab('work')} className={mobileTab === 'work' ? 'active' : ''}><Settings size={20}/><span>作業</span></button>
         <button onClick={() => setMobileTab('history')} className={mobileTab === 'history' ? 'active' : ''}><History size={20}/><span>履歴</span></button>
-        <button onClick={() => {}} className="csv-btn"><Download size={20}/><span>CSV</span></button>
+        <button onClick={exportCSV} className="accent-btn"><Download size={20}/><span>CSV</span></button>
       </nav>
 
       <style jsx global>{`
-        :root { --bg: #0d0f14; --surface: #151820; --border: #252a38; --accent: #5b8fff; }
-        body { background: var(--bg); color: #e8eaf0; margin: 0; font-family: 'Noto Sans JP', sans-serif; padding-bottom: 70px; }
-        .desktop-header { display: none; }
-        @media (min-width: 768px) {
-          .desktop-header { display: flex; align-items: center; justify-content: space-between; padding: 0 2rem; height: 60px; border-bottom: 1px solid var(--border); }
-          body { padding-bottom: 0; }
+        :root {
+          --bg: #0d0f14; --surface: #151820; --surface2: #1c2030;
+          --border: #252a38; --accent: #5b8fff; --accent2: #a78bfa;
+          --text: #e8eaf0; --text-muted: #6b7280;
         }
-        .logo { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.3rem; color: var(--accent); }
-        .main-layout { display: block; }
-        @media (min-width: 768px) { .main-layout { display: grid; grid-template-columns: 1fr 320px; } }
+        body { background: var(--bg); color: var(--text); margin: 0; font-family: 'Noto Sans JP', sans-serif; overflow-x: hidden; }
         
-        .calendar-area { padding: 1rem; }
-        .react-calendar { width: 100% !important; background: transparent !important; border: none !important; }
-        .react-calendar__tile { background: var(--surface) !important; border: 1px solid var(--border) !important; border-radius: 8px !important; min-height: 80px !important; display: flex !important; flex-direction: column !important; align-items: center !important; }
-        .shift-chips-container { display: flex; flex-direction: column; gap: 2px; width: 100%; }
-        .shift-chip { font-size: 0.6rem; padding: 1px 4px; border-radius: 3px; display: flex; align-items: center; gap: 3px; }
-        .shift-chip .dot { width: 4px; height: 4px; border-radius: 50%; }
+        .site-header { display: flex; align-items: center; justify-content: space-between; padding: 0 1.5rem; height: 60px; border-bottom: 1px solid var(--border); background: var(--bg); position: sticky; top: 0; z-index: 100; }
+        .logo { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.2rem; letter-spacing: 0.1em; background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .export-btn { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: white; border: none; padding: 0.45rem 1rem; border-radius: 8px; font-weight: 700; font-size: 0.75rem; cursor: pointer; }
 
-        .mobile-nav { position: fixed; bottom: 0; left: 0; right: 0; background: #151820; border-top: 1px solid #252a38; display: grid; grid-template-columns: repeat(6, 1fr); height: 65px; z-index: 1000; }
-        .mobile-nav button { background: none; border: none; color: #6b7280; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 9px; gap: 4px; }
-        .mobile-nav button.active { color: var(--accent); }
-        .mobile-nav .csv-btn { color: #34d399; }
+        .main-content { display: block; padding-bottom: 80px; }
+        @media (min-width: 768px) { .main-content { display: grid; grid-template-columns: 1fr 340px; padding-bottom: 0; } }
 
-        .section-title { font-family: 'Syne', sans-serif; font-size: 0.7rem; font-weight: 800; color: #6b7280; text-transform: uppercase; margin-bottom: 1rem; display: flex; justify-content: space-between; }
-        .sun { color: #f87171 !important; }
-        .sat { color: #60a5fa !important; }
+        .cal-navigation { display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.5rem; }
+        .cal-navigation button { background: var(--surface); border: 1px solid var(--border); color: white; width: 34px; height: 34px; border-radius: 8px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+        .cal-month-title { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 1.1rem; }
+
+        .calendar-box { padding: 0 1rem; }
+        .react-calendar { width: 100% !important; border: none !important; background: transparent !important; }
+        .react-calendar__month-view__weekdays { display: grid !important; grid-template-columns: repeat(7, 1fr) !important; text-align: center; font-size: 0.65rem; color: var(--text-muted); padding-bottom: 10px; }
+        .react-calendar__month-view__days { display: grid !important; grid-template-columns: repeat(7, 1fr) !important; gap: 4px !important; }
+        .cal-tile { background: var(--surface) !important; border: 1px solid var(--border) !important; border-radius: 8px !important; min-height: 90px !important; padding: 6px !important; display: flex !important; flex-direction: column !important; align-items: flex-start !important; cursor: pointer; position: relative; }
+        .cal-tile.selected { border-color: var(--accent) !important; background: rgba(91,143,255,0.08) !important; }
+        .cal-tile abbr { font-family: 'DM Mono', monospace; font-size: 0.75rem; color: var(--text-muted); text-decoration: none !important; }
+        .sun abbr { color: #f87171 !important; }
+        .sat abbr { color: var(--accent) !important; }
+
+        .date-num.today { background: var(--accent); color: white !important; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: bold; }
+
+        .shift-chips-container { display: flex; flex-direction: column; gap: 2px; width: 100%; margin-top: 5px; }
+        .shift-chip { font-size: 0.58rem; padding: 2px 5px; border-radius: 4px; display: flex; align-items: center; gap: 4px; font-weight: 700; }
+        .dot { width: 5px; height: 5px; border-radius: 50%; }
+
+        .bottom-bar { position: fixed; bottom: 0; left: 0; right: 0; height: 70px; background: #151820; border-top: 1px solid var(--border); display: grid; grid-template-columns: repeat(6, 1fr); z-index: 1000; padding-bottom: env(safe-area-inset-bottom); }
+        .bottom-bar button { background: none; border: none; color: var(--text-muted); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; font-size: 9px; cursor: pointer; }
+        .bottom-bar button.active { color: var(--accent); }
+        .accent-btn { color: #34d399 !important; }
+
+        .pane-card { padding: 1.5rem; }
+        .pane-label { font-family: 'Syne', sans-serif; font-size: 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.12em; }
+        .selected-date-badge { font-family: 'DM Mono', monospace; font-size: 0.8rem; color: var(--accent); background: rgba(91,143,255,0.1); padding: 0.4rem 0.8rem; border-radius: 6px; display: inline-block; margin: 1rem 0; }
+        
+        .pane-form label { display: block; font-size: 0.7rem; color: var(--text-muted); margin-bottom: 0.4rem; }
+        .pane-form input, .pane-form select { width: 100%; background: var(--surface); border: 1px solid var(--border); color: white; padding: 0.7rem; border-radius: 8px; font-size: 0.85rem; margin-bottom: 1rem; outline: none; }
+        .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+        .action-btn-main { width: 100%; background: linear-gradient(135deg, var(--accent), var(--accent2)); border: none; color: white; padding: 0.8rem; border-radius: 10px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+
+        .staff-badge { display: flex; align-items: center; gap: 0.5rem; background: var(--surface); border: 1px solid var(--border); padding: 0.4rem 0.8rem; border-radius: 20px; font-size: 0.8rem; }
+        .avatar-small { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; color: white; font-weight: 800; flex-shrink: 0; margin-right: 4px; }
+
+        .modern-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+        .modern-table th { text-align: left; padding: 0.8rem; color: var(--text-muted); font-size: 0.65rem; text-transform: uppercase; border-bottom: 1px solid var(--border); }
+        .modern-table td { padding: 0.8rem; border-bottom: 1px solid var(--border); }
+        .role-tag { font-weight: 700; font-size: 0.7rem; }
+
+        .assign-row { display: flex; justify-content: space-between; align-items: center; background: var(--surface); border: 1px solid var(--border); padding: 0.8rem; border-radius: 10px; margin-bottom: 0.6rem; }
+        .assign-row select { background: var(--surface2); border: none; color: white; font-size: 0.75rem; padding: 0.3rem 0.6rem; border-radius: 6px; }
+
+        .role-item { display: flex; align-items: center; gap: 0.8rem; padding: 0.7rem; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; font-size: 0.85rem; }
+        .role-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
       `}</style>
     </div>
   )
