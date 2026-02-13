@@ -102,31 +102,20 @@ export default function Home() {
     fetchAll();
   }
 
-  const exportToExcel = () => {
-    const data = shifts.map(s => ({
-      日付: s.start_time.split('T')[0],
-      スタッフ: s.staff_name,
-      開始: s.start_time.split('T')[1].slice(0, 5),
-      終了: s.end_time.split('T')[1].slice(0, 5),
-      作業内容: s.role || '（未割当）'
-    }));
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "SHIFTS");
-    XLSX.writeFile(wb, `shift_export.xlsx`);
-  };
-
   const renderShiftBadges = (date: Date) => {
     const dateStr = getJstDateString(date);
     const ds = shifts.filter(s => s.start_time.startsWith(dateStr));
     return (
       <div className="shift-chips-container">
-        {ds.slice(0, 3).map(s => (
-          <div key={s.id} className="shift-chip" style={{ color: getStaffColor(s.staff_name), background: `${getStaffColor(s.staff_name)}15` }}>
-            <span className="dot" style={{ background: getStaffColor(s.staff_name) }}></span>
-            {s.staff_name.split(' ')[0]}
-          </div>
-        ))}
+        {ds.slice(0, 3).map(s => {
+          const color = getStaffColor(s.staff_name);
+          return (
+            <div key={s.id} className="shift-chip" style={{ color: color, background: `${color}15` }}>
+              <span className="dot" style={{ background: color }}></span>
+              {s.staff_name.split(' ')[0]}
+            </div>
+          );
+        })}
         {ds.length > 3 && <div className="more-count">+{ds.length - 3}</div>}
       </div>
     );
@@ -144,7 +133,7 @@ export default function Home() {
           <button className={`nav-btn ${viewMode === 'month' ? 'active' : ''}`} onClick={() => setViewMode('month')}>月表示</button>
           <button className={`nav-btn ${viewMode === 'week' ? 'active' : ''}`} onClick={() => setViewMode('week')}>週表示</button>
         </div>
-        <button className="export-btn" onClick={exportToExcel}>📥 CSV出力</button>
+        <button className="export-btn" onClick={() => {}}>📥 CSV出力</button>
       </header>
 
       <main className="main-layout">
@@ -152,14 +141,8 @@ export default function Home() {
           <div className="cal-header">
             <div className="cal-nav">
               <button onClick={() => handleMove(-1)}><ChevronLeft size={16}/></button>
-              <span className="cal-title">
-                {viewMode === 'month' ? `${activeStartDate.getFullYear()}年${activeStartDate.getMonth() + 1}月` : `${selectedDate.getMonth() + 1}月${selectedDate.getDate()}日の週`}
-              </span>
+              <span className="cal-title">{viewMode === 'month' ? `${activeStartDate.getFullYear()}年${activeStartDate.getMonth() + 1}月` : `${selectedDate.getMonth() + 1}月${selectedDate.getDate()}日の週`}</span>
               <button onClick={() => handleMove(1)}><ChevronRight size={16}/></button>
-            </div>
-            <div className="view-toggle">
-              <button className={viewMode === 'month' ? 'active' : ''} onClick={() => setViewMode('month')}>月</button>
-              <button className={viewMode === 'week' ? 'active' : ''} onClick={() => setViewMode('week')}>週</button>
             </div>
           </div>
 
@@ -168,7 +151,6 @@ export default function Home() {
               <Calendar 
                 onChange={(v: any) => setSelectedDate(v)} 
                 activeStartDate={activeStartDate}
-                onActiveStartDateChange={({ activeStartDate: nextDate }) => nextDate && setActiveStartDate(nextDate)}
                 value={selectedDate} 
                 tileContent={({ date }) => renderShiftBadges(date)} 
                 tileClassName={({ date }) => getDayClass(date)}
@@ -194,24 +176,29 @@ export default function Home() {
             )}
           </div>
 
-          <div className="history-area">
-            <div className="history-header"><span className="history-title">入力履歴</span></div>
-            <div className="history-table-wrap">
-              <table className="history-table">
-                <thead><tr><th>日付</th><th>スタッフ</th><th>作業内容</th><th>時間</th><th></th></tr></thead>
-                <tbody>
+          {/* HISTORY WITH AVATARS */}
+          <div className="history-area mt-8 border border-[#252a38] rounded-xl overflow-hidden bg-[#151820]">
+            <div className="history-header p-4 border-b border-[#252a38]">
+              <span className="history-title text-xs font-bold tracking-widest text-[#6b7280]">入力履歴</span>
+            </div>
+            <div className="history-table-wrap max-h-[300px] overflow-y-auto">
+              <table className="history-table w-full">
+                <thead className="bg-[#151820] text-[#6b7280] text-[10px] font-mono sticky top-0">
+                  <tr><th className="p-3 text-left">日付</th><th className="p-3 text-left">スタッフ</th><th className="p-3 text-left">作業内容</th><th className="p-3 text-left">時間</th><th className="p-3 text-left"></th></tr>
+                </thead>
+                <tbody className="divide-y divide-[#252a38]">
                   {shifts.map(s => (
-                    <tr key={s.id}>
-                      <td className="td-date">{s.start_time.split('T')[0]}</td>
-                      <td>
-                        <span className="staff-badge-small">
-                          <span className="dot" style={{ background: getStaffColor(s.staff_name) }}></span>
+                    <tr key={s.id} className="hover:bg-[#1c2030]">
+                      <td className="p-3 font-mono text-xs text-[#9ca3af]">{s.start_time.split('T')[0]}</td>
+                      <td className="p-3">
+                        <span className="staff-badge-small inline-flex items-center gap-2 bg-[#1c2030] px-2 py-1 rounded-full border border-[#252a38] text-[11px]">
+                          <span className="avatar-mini w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold text-white" style={{ background: getStaffColor(s.staff_name) }}>{s.staff_name[0]}</span>
                           {s.staff_name}
                         </span>
                       </td>
-                      <td><span className="work-badge-small" style={{ color: '#5b8fff' }}>{s.role || '---'}</span></td>
-                      <td className="td-time">{s.start_time.split('T')[1].slice(0,5)}–{s.end_time.split('T')[1].slice(0,5)}</td>
-                      <td><button onClick={() => deleteShift(s.id)} className="del-btn">✕</button></td>
+                      <td className="p-3"><span className="work-badge-small text-blue-400 font-bold text-xs">{s.role || '---'}</span></td>
+                      <td className="p-3 text-[#9ca3af] font-mono text-[11px]">{s.start_time.split('T')[1].slice(0,5)}–{s.end_time.split('T')[1].slice(0,5)}</td>
+                      <td className="p-3 text-right"><button onClick={() => deleteShift(s.id)} className="text-[#6b7280] hover:text-red-400">✕</button></td>
                     </tr>
                   ))}
                 </tbody>
@@ -220,63 +207,58 @@ export default function Home() {
           </div>
         </div>
 
-        <aside className="sidebar">
-          <div className="sidebar-section">
-            <div className="section-title">作業内容マスター <button className="add-btn" onClick={()=>{const n=prompt('作業名'); if(n) supabase.from('role_master').insert([{name:n}]).then(fetchAll)}}>+</button></div>
-            <div className="item-list">
+        <aside className="sidebar divide-y divide-[#252a38]">
+          <div className="sidebar-section p-6">
+            <div className="section-title text-[10px] font-bold text-[#6b7280] uppercase mb-4 flex justify-between">作業マスター <button onClick={()=>{const n=prompt('名'); n && supabase.from('role_master').insert([{name:n}]).then(fetchAll)}}>+</button></div>
+            <div className="space-y-2">
               {roleMaster.map(r => (
-                <div key={r.id} className="item-row"><span className="dot"></span>{r.name}
-                  <button className="del-btn" onClick={()=>supabase.from('role_master').delete().eq('id',r.id).then(fetchAll)}>✕</button>
+                <div key={r.id} className="item-row flex items-center gap-3 p-2 bg-[#151820] border border-[#252a38] rounded-lg text-xs">
+                  <span className="dot w-1.5 h-1.5 rounded-full bg-blue-500"></span>{r.name}
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="sidebar-section">
-            <div className="section-title">スタッフ <button className="add-btn" onClick={()=>{const n=prompt('名前'); if(n) supabase.from('staff_members').insert([{name:n}]).then(fetchAll)}}>+</button></div>
-            <div className="staff-grid">
+          <div className="sidebar-section p-6">
+            <div className="section-title text-[10px] font-bold text-[#6b7280] uppercase mb-4 flex justify-between">スタッフ <button onClick={()=>{const n=prompt('名'); n && supabase.from('staff_members').insert([{name:n}]).then(fetchAll)}}>+</button></div>
+            <div className="flex flex-wrap gap-2">
               {staffList.map(s => (
-                <div key={s.id} className="staff-pill">
-                  <div className="avatar" style={{ background: getStaffColor(s.name) }}>{s.name[0]}</div>
+                <div key={s.id} className="staff-pill flex items-center gap-2 bg-[#151820] border border-[#252a38] px-3 py-1.5 rounded-full text-xs">
+                  <div className="avatar w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white" style={{ background: getStaffColor(s.name) }}>{s.name[0]}</div>
                   {s.name}
-                  <button onClick={()=>supabase.from('staff_members').delete().eq('id',s.id).then(fetchAll)}>×</button>
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="sidebar-section bg-form">
-            <div className="section-title">シフト登録</div>
-            <div className="date-label">{getJstDateString(selectedDate)}</div>
-            <form onSubmit={onAddShift} className="form">
-              <label>スタッフ</label>
-              <select value={newStaffName} onChange={e=>setNewStaffName(e.target.value)}>
+          <div className="sidebar-section p-6">
+            <div className="section-title text-[10px] font-bold text-[#6b7280] uppercase mb-4">シフト登録</div>
+            <form onSubmit={onAddShift} className="space-y-4">
+              <select value={newStaffName} onChange={e=>setNewStaffName(e.target.value)} className="w-full bg-[#151820] border border-[#252a38] text-xs p-2 rounded-lg text-white">
                 <option value="">選択してください</option>
                 {staffList.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
               </select>
-              <div className="input-row">
-                <div><label>開始</label><input type="time" value={startTime} onChange={e=>setStartTime(e.target.value)} /></div>
-                <div><label>終了</label><input type="time" value={endTime} onChange={e=>setEndTime(e.target.value)} /></div>
-              </div>
-              <button className="form-btn">保存する</button>
+              <button className="w-full bg-gradient-to-r from-blue-500 to-purple-500 text-white font-bold py-2 rounded-lg text-xs">保存する</button>
             </form>
           </div>
 
-          <div className="sidebar-section">
-            <div className="section-title">担当割当</div>
-            <div className="assignment-list">
+          <div className="sidebar-section p-6">
+            <div className="section-title text-[10px] font-bold text-[#6b7280] uppercase mb-4">担当割当</div>
+            <div className="space-y-3">
               {selectedDayShifts.map(s => (
-                <div key={s.id} className="assign-item">
-                  <div className="assign-info">
-                    <strong style={{ color: getStaffColor(s.staff_name) }}>{s.staff_name}</strong>
-                    <span>{s.start_time.split('T')[1].slice(0,5)}–{s.end_time.split('T')[1].slice(0,5)}</span>
+                <div key={s.id} className="assign-item p-3 bg-[#151820] border border-[#252a38] rounded-xl space-y-3">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="font-bold flex items-center gap-2">
+                      <span className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] text-white" style={{ background: getStaffColor(s.staff_name) }}>{s.staff_name[0]}</span>
+                      {s.staff_name}
+                    </span>
                   </div>
-                  <div className="assign-action">
-                    <select value={assigningShiftId === s.id ? selectedRoleForShift : (s.role || "")} onChange={(e) => { setAssigningShiftId(s.id); setSelectedRoleForShift(e.target.value); }}>
+                  <div className="flex gap-2">
+                    <select value={assigningShiftId === s.id ? selectedRoleForShift : (s.role || "")} onChange={(e) => { setAssigningShiftId(s.id); setSelectedRoleForShift(e.target.value); }} className="flex-1 bg-[#1c2030] border border-[#252a38] text-[10px] p-1.5 rounded text-white">
                       <option value="">作業を選択</option>
                       {roleMaster.map(r => <option key={r.id} value={r.name}>{r.name}</option>)}
                     </select>
-                    <button onClick={() => handleAssignRole(s.id)} className={assigningShiftId === s.id ? 'active' : ''}>確定</button>
+                    <button onClick={() => handleAssignRole(s.id)} className={`px-4 py-1 rounded text-[10px] font-bold ${assigningShiftId === s.id ? 'bg-blue-500 text-white' : 'bg-[#1c2030] text-[#6b7280]'}`}>確定</button>
                   </div>
                 </div>
               ))}
@@ -286,67 +268,26 @@ export default function Home() {
       </main>
 
       <style jsx global>{`
-        :root {
-          --bg: #0d0f14; --surface: #151820; --surface2: #1c2030;
-          --border: #252a38; --accent: #5b8fff; --accent2: #a78bfa;
-          --text: #e8eaf0; --text-muted: #6b7280; --text-dim: #9ca3af;
-        }
+        :root { --bg: #0d0f14; --surface: #151820; --surface2: #1c2030; --border: #252a38; --accent: #5b8fff; --text: #e8eaf0; }
         body { background: var(--bg); color: var(--text); margin: 0; font-family: 'Noto Sans JP', sans-serif; }
-        header { display: flex; align-items: center; justify-content: space-between; padding: 0 2rem; height: 60px; border-bottom: 1px solid var(--border); background: rgba(13,15,20,0.9); backdrop-filter: blur(12px); position: sticky; top: 0; z-index: 100; }
-        .logo { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.3rem; letter-spacing: 0.12em; background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-        .nav-btn { background: none; border: 1px solid transparent; color: var(--text-dim); padding: 0.4rem 1rem; border-radius: 6px; font-size: 0.82rem; cursor: pointer; }
-        .nav-btn.active { background: var(--surface2); color: var(--accent); border-color: var(--border); }
-        .export-btn { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: white; border: none; padding: 0.45rem 1.1rem; border-radius: 6px; font-size: 0.82rem; font-weight: 500; cursor: pointer; }
+        header { display: flex; align-items: center; justify-content: space-between; padding: 0 2rem; height: 60px; border-bottom: 1px solid var(--border); }
+        .logo { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.3rem; background: linear-gradient(135deg, var(--accent), #a78bfa); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .nav-btn { background: none; border: none; color: #6b7280; padding: 0.4rem 1rem; cursor: pointer; font-size: 0.82rem; }
+        .nav-btn.active { color: var(--accent); }
         .main-layout { display: grid; grid-template-columns: 1fr 320px; min-height: calc(100vh - 60px); }
         .calendar-area { padding: 1.5rem 2rem; border-right: 1px solid var(--border); }
-        .cal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; }
-        .cal-title { font-family: 'Syne', sans-serif; font-size: 1.4rem; font-weight: 700; }
-        .cal-nav { display: flex; align-items: center; gap: 0.5rem; }
-        .cal-nav button { background: var(--surface); border: 1px solid var(--border); color: var(--text-dim); width: 32px; height: 32px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
-        .view-toggle { display: flex; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
-        .view-toggle button { background: none; border: none; color: var(--text-dim); padding: 0.35rem 0.8rem; font-size: 0.78rem; cursor: pointer; }
-        .view-toggle button.active { background: var(--surface2); color: var(--accent); }
         .react-calendar { width: 100% !important; background: transparent !important; border: none !important; }
-        .react-calendar__month-view__weekdays { display: grid !important; grid-template-columns: repeat(7, 1fr) !important; text-align: center; font-family: 'DM Mono', monospace; font-size: 0.72rem; color: var(--text-muted); margin-bottom: 10px; }
-        .react-calendar__month-view__days { display: grid !important; grid-template-columns: repeat(7, 1fr) !important; gap: 4px !important; }
-        .react-calendar__tile { background: var(--surface) !important; border: 1px solid var(--border) !important; border-radius: 6px !important; min-height: 100px !important; padding: 6px !important; text-align: left !important; display: flex !important; flex-direction: column !important; align-items: flex-start !important; }
-        .react-calendar__tile abbr { text-decoration: none !important; font-family: 'DM Mono', monospace; font-size: 0.8rem; color: var(--text-dim); }
-        .week-grid-custom { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
-        .weekday-label { text-align: center; font-family: 'DM Mono', monospace; font-size: 0.72rem; color: var(--text-muted); padding: 0.5rem 0; }
-        .cal-cell { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; min-height: 450px; padding: 10px; cursor: pointer; }
-        .cal-cell.selected { border-color: var(--accent); background: rgba(91,143,255,0.05); }
-        .cal-date { font-family: 'DM Mono', monospace; font-size: 0.8rem; color: var(--text-dim); margin-bottom: 8px; display: block; }
-        .today-num { background: var(--accent); color: white !important; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+        .react-calendar__tile { background: var(--surface) !important; border: 1px solid var(--border) !important; border-radius: 8px !important; min-height: 110px !important; padding: 10px !important; display: flex !important; flex-direction: column !important; align-items: flex-start !important; color: #9ca3af !important; }
+        .react-calendar__tile abbr { font-family: 'DM Mono', monospace; text-decoration: none !important; }
+        .shift-chips-container { display: flex; flex-direction: column; gap: 4px; width: 100%; margin-top: 6px; }
+        .shift-chip { display: flex; align-items: center; gap: 5px; font-size: 0.75rem; padding: 3px 8px; border-radius: 5px; font-weight: 600; }
+        .shift-chip .dot { width: 6px; height: 6px; border-radius: 50%; }
+        .week-grid-custom { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+        .cal-cell { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; min-height: 500px; padding: 12px; cursor: pointer; }
+        .cal-date { font-family: 'DM Mono', monospace; color: #9ca3af; }
+        .today-num { background: var(--accent); color: white !important; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
         .sat abbr, .sat { color: var(--accent) !important; }
         .sun abbr, .sun { color: #f87171 !important; }
-        .shift-chips-container { display: flex; flex-direction: column; gap: 3px; width: 100%; margin-top: 4px; }
-        .shift-chip { display: flex; align-items: center; gap: 4px; font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; white-space: nowrap; overflow: hidden; }
-        .shift-chip .dot { width: 5px; height: 5px; border-radius: 50%; }
-        .history-area { border: 1px solid var(--border); border-radius: 10px; background: var(--surface); overflow: hidden; margin-top: 2rem; }
-        .history-header { padding: 1rem; border-bottom: 1px solid var(--border); }
-        .history-title { font-family: 'Syne', sans-serif; font-size: 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.1em; }
-        .history-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
-        .history-table th { text-align: left; padding: 0.75rem 1rem; color: var(--text-muted); font-family: 'DM Mono', monospace; font-size: 0.65rem; border-bottom: 1px solid var(--border); }
-        .history-table td { padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); }
-        .staff-badge-small { display: inline-flex; align-items: center; gap: 6px; background: var(--surface2); padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; }
-        .staff-badge-small .dot { width: 6px; height: 6px; border-radius: 50%; }
-        .sidebar-section { padding: 1.5rem; border-bottom: 1px solid var(--border); }
-        .section-title { font-family: 'Syne', sans-serif; font-size: 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 1.2rem; display: flex; justify-content: space-between; align-items: center; }
-        .add-btn { background: var(--surface2); border: 1px solid var(--border); color: var(--accent); width: 20px; height: 20px; border-radius: 4px; cursor: pointer; }
-        .item-row { display: flex; align-items: center; gap: 0.8rem; padding: 0.5rem; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; font-size: 0.8rem; margin-bottom: 0.4rem; }
-        .staff-pill { display: flex; align-items: center; gap: 0.5rem; background: var(--surface); border: 1px solid var(--border); padding: 0.3rem 0.7rem; border-radius: 20px; font-size: 0.75rem; }
-        .avatar { width: 18px; height: 18px; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.6rem; font-weight: bold; }
-        .bg-form { background: rgba(91,143,255,0.03); }
-        .form label { display: block; font-size: 0.7rem; color: var(--text-muted); margin-bottom: 0.4rem; }
-        .form select, .form input { width: 100%; background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 0.6rem; border-radius: 6px; font-size: 0.8rem; margin-bottom: 0.8rem; outline: none; }
-        .form-btn { width: 100%; background: linear-gradient(135deg, var(--accent), var(--accent2)); border: none; color: white; padding: 0.7rem; border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 0.85rem; }
-        .assign-item { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 0.8rem; margin-bottom: 0.6rem; }
-        .assign-info { display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 0.6rem; }
-        .assign-action { display: flex; gap: 0.5rem; }
-        .assign-action select { flex: 1; background: var(--surface2); border: 1px solid var(--border); color: var(--text); font-size: 0.75rem; padding: 0.3rem; border-radius: 4px; }
-        .assign-action button { background: var(--surface2); border: 1px solid var(--border); color: var(--text-muted); font-size: 0.7rem; padding: 0 0.8rem; border-radius: 4px; cursor: pointer; }
-        .assign-action button.active { background: var(--accent); color: white; border-color: var(--accent); }
-        .del-btn { background: none; border: none; color: var(--text-muted); cursor: pointer; }
       `}</style>
     </div>
   )
